@@ -1,0 +1,10 @@
+#pragma once
+
+#include <filesystem>
+
+
+namespace buildinfo {
+
+inline const std::filesystem::path resource_dir {"${CMAKE_CURRENT_SOURCE_DIR}/res"};
+
+} // namespace buildconfig
