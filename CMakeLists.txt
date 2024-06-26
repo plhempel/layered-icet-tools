@@ -83,11 +83,10 @@ if (ICET_USE_PARICOMPRESS)
 		CONFIGURE_COMMAND ""
 		BUILD_IN_SOURCE   1
 		)
-	ExternalProject_Get_Property (paricomp SOURCE_DIR)
-	set (paricomp_SOURCE_DIR "${SOURCE_DIR}")
 
-	set (PARICOMPRESS_INCLUDE_DIRECTORY "${paricomp_SOURCE_DIR}/include")
-	set (PARICOMPRESS_LIBRARY           "${paricomp_SOURCE_DIR}/lib/libparicompress.a")
+	ExternalProject_Get_Property (paricomp SOURCE_DIR)
+	set (PARICOMPRESS_INCLUDE_DIRECTORY "${SOURCE_DIR}/include")
+	set (PARICOMPRESS_LIBRARY           "${SOURCE_DIR}/lib/libparicompress.a")
 	endif ()
 
 # Dependency: MPI.
@@ -162,6 +161,7 @@ find_package (OpenGL REQUIRED "${GL_COMPONENTS}")
 # Use dependency: EGL GLEW.
 if ("glew" IN_LIST FETCH_CONTENT_DEPS)
 	target_include_directories (icet-demo PRIVATE "${glew_SOURCE_DIR}/include")
+	target_compile_definitions (icet-demo PRIVATE "GLEW_NO_GLU")
 	target_link_libraries (icet-demo glew)
 	endif ()
 
