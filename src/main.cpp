@@ -715,6 +715,7 @@ auto main(int argc, char** argv) -> int try {
 
 	icetBoundingBoxf(-1, 1, -1, 1, -1, 1);
 	icetStrategy(ICET_STRATEGY_REDUCE);
+	icetSingleImageStrategy(ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC);
 	icetResetTiles();
 
 	icetAddTile(0, 0, width, height, 0);
