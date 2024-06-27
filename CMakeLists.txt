@@ -40,10 +40,14 @@ target_link_libraries (icet-demo glm::glm)
 set (ICETDEMO_LOCAL_ICET "" CACHE PATH
 		"Path to the source directory of IceT. If set to a false value, IceT will be downloaded from the Kitware GitLab repository.")
 
+# Option: Local PARI Compression.
+set (ICETDEMO_LOCAL_PARICOMP "" CACHE PATH
+		"Path to the source directory of PARI Compression. If set to a false value, PARI will be downloaded from the GitHub repository if required.")
+
 # Add dependency: IceT.
 if (ICETDEMO_LOCAL_ICET)
 	if (NOT EXISTS "${ICETDEMO_LOCAL_ICET}/CMakeLists.txt")
-		message (FATAL_ERROR "The configured IceT source directory at ${ICETDEMO_LOCAL_ICET} does not contain a CMake project!")
+		message (FATAL_ERROR "The configured IceT source directory at ${ICETDEMO_LOCAL_ICET} does not contain a CMake project. Please verify that the path is correct.")
 		endif ()
 
 	FetchContent_Declare (icet
@@ -57,36 +61,38 @@ else ()
 	endif ()
 
 list (APPEND FETCH_CONTENT_DEPS icet)
-set (BUILD_TESTING "0" CACHE BOOL "")
+set (ICET_INSTALL_NO_RUNTIME     "1" CACHE BOOL "")
+set (ICET_INSTALL_NO_DEVELOPMENT "1" CACHE BOOL "")
 
 if (ICET_USE_PARICOMPRESS)
-	# Option: Local PARI Compression.
-	set (ICETDEMO_LOCAL_PARICOMP "" CACHE PATH
-			"Path to the source directory of PARI Compression. If set to a false value, PARI will be downloaded from the GitHub repository.")
-
-	if (ICETDEMO_LOCAL_PARICOMP)
-		if (NOT EXISTS "${ICETDEMO_LOCAL_PARICOMP}/Makefile")
-			message (FATAL_ERROR "The configured PARI Compression source directory at ${ICETDEMO_LOCAL_PARICOMP} does not contain a Makefile!")
-			endif ()
-
-		set (PARICOMP_DOWNLOAD_ARGS "SOURCE_DIR" "${ICETDEMO_LOCAL_PARICOMP}")
-	else ()
-		set (PARICOMP_DOWNLOAD_ARGS
-				GIT_REPOSITORY    "https://github.com/tmarrinan/pari-compression"
-				GIT_TAG           "a5ee535"
-				)
-		endif()
+	enable_language (CUDA)
 
 	# Dependency: PARI Compression.
-	ExternalProject_Add (paricomp
-		"${PARICOMP_DOWNLOAD_ARGS}"
-		CONFIGURE_COMMAND ""
-		BUILD_IN_SOURCE   1
-		)
+	add_library (paricomp)
 
-	ExternalProject_Get_Property (paricomp SOURCE_DIR)
-	set (PARICOMPRESS_INCLUDE_DIRECTORY "${SOURCE_DIR}/include")
-	set (PARICOMPRESS_LIBRARY           "${SOURCE_DIR}/lib/libparicompress.a")
+	if (ICETDEMO_LOCAL_PARICOMP)
+		if (NOT EXISTS "${ICETDEMO_LOCAL_PARICOMP}/src/paricompress.cu")
+			message (FATAL_ERROR "The configured PARI Compression source directory at ${ICETDEMO_LOCAL_PARICOMP} is missing a file. Please verify that the path is correct.")
+			endif ()
+
+		set (SOURCE_DIR "${ICETDEMO_LOCAL_PARICOMP}")
+	else ()
+		ExternalProject_Add (paricomp-src
+			GIT_REPOSITORY    "https://github.com/tmarrinan/pari-compression"
+			GIT_TAG           "a5ee535"
+			CONFIGURE_COMMAND ""
+			BUILD_COMMAND     ""
+			INSTALL_COMMAND   ""
+			)
+		ExternalProject_Get_Property (paricomp-src SOURCE_DIR)
+		add_dependencies (paricomp paricomp-src)
+		endif ()
+
+	set (PARICOMPRESS_INCLUDE_DIRECTORY "${SOURCE_DIR}/include" CACHE PATH "" FORCE)
+	set (PARICOMPRESS_LIBRARY           "paricomp"              CACHE PATH "" FORCE)
+
+	target_sources (paricomp PRIVATE "${SOURCE_DIR}/src/paricompress.cu")
+	target_include_directories (paricomp PUBLIC "${PARICOMPRESS_INCLUDE_DIRECTORY}")
 	endif ()
 
 # Dependency: MPI.
@@ -166,10 +172,6 @@ if ("glew" IN_LIST FETCH_CONTENT_DEPS)
 	endif ()
 
 # Use dependency: IceT.
-if (ICET_USE_PARICOMPRESS)
-	add_dependencies (IceTCore paricomp)
-	endif ()
-
 target_include_directories (icet-demo PRIVATE
 	"${icet_SOURCE_DIR}/src/include"
 	"${icet_BINARY_DIR}/src/include"
@@ -187,6 +189,3 @@ if ("png++" IN_LIST FETCH_CONTENT_DEPS)
 	target_link_libraries (icet-demo png++)
 	target_include_directories (png++ INTERFACE "${png++_SOURCE_DIR}")
 	endif ()
-
-# Configure installation.
-install(TARGETS icet-demo)
