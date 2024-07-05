@@ -36,29 +36,10 @@ if (NOT glm_FOUND)
 	endif ()
 target_link_libraries (icet-demo glm::glm)
 
-# Option: Local IceT.
-set (ICETDEMO_LOCAL_ICET "" CACHE PATH
-		"Path to the source directory of IceT. If set to a false value, IceT will be downloaded from the Kitware GitLab repository.")
-
-# Option: Local PARI Compression.
-set (ICETDEMO_LOCAL_PARICOMP "" CACHE PATH
-		"Path to the source directory of PARI Compression. If set to a false value, PARI will be downloaded from the GitHub repository if required.")
-
 # Add dependency: IceT.
-if (ICETDEMO_LOCAL_ICET)
-	if (NOT EXISTS "${ICETDEMO_LOCAL_ICET}/CMakeLists.txt")
-		message (FATAL_ERROR "The configured IceT source directory at ${ICETDEMO_LOCAL_ICET} does not contain a CMake project. Please verify that the path is correct.")
-		endif ()
-
-	FetchContent_Declare (icet
-		SOURCE_DIR "${ICETDEMO_LOCAL_ICET}"
-		)
-else ()
-	FetchContent_Declare (icet
-		GIT_REPOSITORY "https://gitlab.kitware.com/icet/icet"
-		GIT_TAG        "365e3695"
-		)
-	endif ()
+FetchContent_Declare (icet
+	SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/dep/icet"
+	)
 
 list (APPEND FETCH_CONTENT_DEPS icet)
 set (ICET_INSTALL_NO_RUNTIME     "1" CACHE BOOL "")
@@ -68,31 +49,14 @@ if (ICET_USE_PARICOMPRESS)
 	enable_language (CUDA)
 
 	# Dependency: PARI Compression.
-	add_library (paricomp)
+	add_library (paricompress)
 
-	if (ICETDEMO_LOCAL_PARICOMP)
-		if (NOT EXISTS "${ICETDEMO_LOCAL_PARICOMP}/src/paricompress.cu")
-			message (FATAL_ERROR "The configured PARI Compression source directory at ${ICETDEMO_LOCAL_PARICOMP} is missing a file. Please verify that the path is correct.")
-			endif ()
+	set (paricompress_SOURCE_DIR        "${CMAKE_CURRENT_LIST_DIR}/dep/paricompress")
+	set (PARICOMPRESS_INCLUDE_DIRECTORY "${paricompress_SOURCE_DIR}/include" CACHE PATH "" FORCE)
+	set (PARICOMPRESS_LIBRARY           "paricompress"                       CACHE PATH "" FORCE)
 
-		set (SOURCE_DIR "${ICETDEMO_LOCAL_PARICOMP}")
-	else ()
-		ExternalProject_Add (paricomp-src
-			GIT_REPOSITORY    "https://github.com/tmarrinan/pari-compression"
-			GIT_TAG           "a5ee535"
-			CONFIGURE_COMMAND ""
-			BUILD_COMMAND     ""
-			INSTALL_COMMAND   ""
-			)
-		ExternalProject_Get_Property (paricomp-src SOURCE_DIR)
-		add_dependencies (paricomp paricomp-src)
-		endif ()
-
-	set (PARICOMPRESS_INCLUDE_DIRECTORY "${SOURCE_DIR}/include" CACHE PATH "" FORCE)
-	set (PARICOMPRESS_LIBRARY           "paricomp"              CACHE PATH "" FORCE)
-
-	target_sources (paricomp PRIVATE "${SOURCE_DIR}/src/paricompress.cu")
-	target_include_directories (paricomp PUBLIC "${PARICOMPRESS_INCLUDE_DIRECTORY}")
+	target_sources (paricompress PRIVATE "${paricompress_SOURCE_DIR}/src/paricompress.cu")
+	target_include_directories (paricompress PUBLIC "${PARICOMPRESS_INCLUDE_DIRECTORY}")
 	endif ()
 
 # Dependency: MPI.
