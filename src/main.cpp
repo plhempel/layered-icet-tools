@@ -714,8 +714,8 @@ auto main(int argc, char** argv) -> int try {
 	icetGL3DrawCallbackTexture(draw);
 
 	icetBoundingBoxf(-1, 1, -1, 1, -1, 1);
-	icetStrategy(ICET_STRATEGY_REDUCE);
-	icetSingleImageStrategy(ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC);
+	icetStrategy(ICET_STRATEGY_SEQUENTIAL);
+	icetSingleImageStrategy(ICET_SINGLE_IMAGE_STRATEGY_GPU_BSWAP);
 	icetResetTiles();
 
 	icetAddTile(0, 0, width, height, 0);
