@@ -1,4 +1,3 @@
-#include <array>
 #include <concepts>
 #include <filesystem>
 #include <fstream>
@@ -24,23 +23,13 @@
 	#endif
 
 #include "buildinfo.hpp"
+#include "common.hpp"
 
 
-namespace {
+namespace deep_icet {
 
 // Aliases.
 namespace fs = std::filesystem;
-
-
-// Output utilities.
-std::string_view constexpr log_sev_info  {      "\x1b[1m[info]\x1b[m  "};
-std::string_view constexpr log_sev_warn  {   "\x1b[1;33m[warn]\x1b[m  "};
-std::string_view constexpr log_sev_error {   "\x1b[1;31m[error]\x1b[m "};
-std::string_view constexpr log_sev_fatal {"\x1b[1;30;41m[fatal]\x1b[m "};
-
-std::string_view constexpr log_tag_egl    {"\x1b[1m[egl]\x1b[m "};
-std::string_view constexpr log_tag_glfw   {"\x1b[1m[glfw]\x1b[m "};
-std::string_view constexpr log_tag_opengl {"\x1b[1m[opengl]\x1b[m "};
 
 /// Concatenate arguments into a string using a string stream for formatting.
 template<typename... TArgs>
@@ -572,6 +561,7 @@ auto draw(
 
 auto main(int argc, char** argv) -> int try {
 	using namespace std::string_literals;
+	using namespace deep_icet;
 
 	// Application configuration.
 	int  width     {750};
@@ -692,7 +682,7 @@ auto main(int argc, char** argv) -> int try {
 			-3 * std::abs(norm_rank - 1./3) + 1,
 			-3 * std::abs(norm_rank - 2./3) + 1
 			}};
-	::renderer = &renderer;
+	deep_icet::renderer = &renderer;
 
 	{
 	std::vector<QuadRenderer::Quad> quads;
@@ -823,10 +813,10 @@ auto main(int argc, char** argv) -> int try {
 	return EXIT_SUCCESS;
 	}
 	catch (std::exception const& error) {
-		std::cerr << log_sev_fatal << error.what() << "\n";
+		std::cerr << deep_icet::log_sev_fatal << error.what() << "\n";
 		return EXIT_FAILURE;
 		}
 	catch (...) {
-		std::cerr << log_sev_fatal << "Unknown error\n";
+		std::cerr << deep_icet::log_sev_fatal << "Unknown error\n";
 		return EXIT_FAILURE;
 		}
