@@ -1,63 +1,37 @@
-#include <array>
-#include <cstdint>
+#include <cstdlib>
 #include <iostream>
-#include <limits>
-
-#include <png.hpp>
 
 #include "common.hpp"
 
 
-/// Blend PNG files passed as command line arguments from front to back.
+/// Blend PNG files front to back.
+/// Expected arguments: <width> <height> [<image>]...
 auto main(int const argc, char const* const argv[]) -> int try {
 	using namespace deep_icet;
 
-	// Verify that there is at least one layer.
-	if (argc <= 1) {
-		std::cerr << log_sev_warn << "No input given, so no output will be produced.\n";
-		return EXIT_SUCCESS;
+	// Parse output size.
+	ImageSize width, height;
+
+	if (argc < 3
+			or (width  = atoi(argv[1])) == 0
+			or (height = atoi(argv[2])) == 0
+			) {
+		std::cerr << log_sev_fatal << "Invalid or missing arguments.\n"
+		             "Usage: " << argv[0] << " <width> <height> [<image>]...\n";
+		return EXIT_FAILURE;
 		}
 
-	// Define pixel format.
-	using Channel   = uint8_t;
-	using Pixel     = png::basic_rgba_pixel<Channel>;
-	using PixelData = std::array<Channel, Pixel::traits::channels>;
-	using Image     = png::image<Pixel>;
+	// Allocate empty result image.
+	Image blend {width, height};
 
-	auto constexpr alpha_channel {Pixel::traits::channels - 1};
-	auto constexpr channel_max   {std::numeric_limits<Channel>::max()};
-
-	// Initialize the output image to the first layer.
-	Image      blend  {argv[1]};
-	auto const width  {blend.get_width()};
-	auto const height {blend.get_height()};
-
-	using ImageSize = std::remove_cv_t<decltype(width)>;
-
-	// Scale colors by opacity.
-	for (ImageSize y {0}; y < height; ++y) {
-		for (ImageSize x {0}; x < width; ++x) {
-			auto& pixel {reinterpret_cast<PixelData&>(blend[y][x])};
-
-			for (auto i {0}; i < alpha_channel; ++i) {
-				pixel[i] = pixel[i] * pixel[alpha_channel] / channel_max;
-				}}}
-
-	// Add remaining layers behind.
-	for (auto const* arg_it {&argv[2]}; arg_it < &argv[argc]; ++arg_it) {
+	// Add layers.
+	for (auto argi {3}; argi < argc; ++argi) {
 		// Read image.
-		Image const layer {*arg_it};
-
-		// Ensure all layers have the same size.
-		if (layer.get_width() != width or layer.get_height() != height) {
-			std::cerr << log_sev_error << "Skipping " << *arg_it
-			          << ", which has a different size than the first layer.";
-			continue;
-			}
+		Image const layer {argv[argi]};
 
 		// Blend pixels using the over operator.
-		for (ImageSize y {0}; y < height; ++y) {
-			for (ImageSize x {0}; x < width; ++x) {
+		for (ImageSize y {0}; y < std::min(height, layer.get_height()); ++y) {
+			for (ImageSize x {0}; x < std::min(width, layer.get_width()); ++x) {
 				auto& blend_pixel {reinterpret_cast<PixelData&      >(blend[y][x])};
 				auto& layer_pixel {reinterpret_cast<PixelData const&>(layer[y][x])};
 
