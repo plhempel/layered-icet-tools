@@ -21,6 +21,7 @@ add_executable (blend
 	"src/blend.cpp"
 	"src/common.hpp"
 	)
+target_compile_options (blend PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 # Target: deep-icet.
 add_executable (deep-icet
