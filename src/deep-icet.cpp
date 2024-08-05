@@ -195,18 +195,10 @@ auto main(int argc, char* argv[]) -> int try {
 	icet::Communicator com {mpi_com};
 	icet::Context      ctx {com};
 
-	std::vector<IceTInt> rank_order;
-	rank_order.reserve(num_procs);
-
-	for (auto i {0}; i < num_procs; ++i) {
-		rank_order.push_back(i);
-		}
-
-	icetCompositeOrder(rank_order.data());
 	icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
 
 	icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
-	icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);
+	icetSetDepthFormat(ICET_IMAGE_DEPTH_FLOAT);
 
 	icetStrategy(ICET_STRATEGY_SEQUENTIAL);
 	icetSingleImageStrategy(ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC);
@@ -266,9 +258,9 @@ auto main(int argc, char* argv[]) -> int try {
 
 	// Composite images from all ranks.
 	std::array<IceTFloat, 4> const background {0, 0, 0, 0};
-	auto const result_image {icetCompositeImage(
+	auto const result_image {icetCompositeImageLayered(
 			local_ldi.data(),
-			nullptr,
+			local_layers.size(),
 			nullptr,
 			nullptr,
 			nullptr,
