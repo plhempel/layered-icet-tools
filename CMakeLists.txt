@@ -75,6 +75,9 @@ list (APPEND FETCH_CONTENT_DEPS "png++")
 FetchContent_MakeAvailable ("${FETCH_CONTENT_DEPS}")
 
 # Use dependency: IceT.
+target_compile_definitions (IceTCore PRIVATE
+	ICET_COMPRESSED_IMAGE_OUT_FILE="compression-result.icet"
+	)
 target_include_directories (deep-icet PRIVATE
 	"${icet_SOURCE_DIR}/src/include"
 	"${icet_BINARY_DIR}/src/include"
