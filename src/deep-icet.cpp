@@ -195,13 +195,14 @@ auto main(int argc, char* argv[]) -> int try {
 	icet::Communicator com {mpi_com};
 	icet::Context      ctx {com};
 
+	icetDiagnostics(ICET_DIAG_FULL);
+
+	icetStrategy(ICET_STRATEGY_SEQUENTIAL);
+	icetSingleImageStrategy(ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC);
 	icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
 
 	icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
 	icetSetDepthFormat(ICET_IMAGE_DEPTH_FLOAT);
-
-	icetStrategy(ICET_STRATEGY_SEQUENTIAL);
-	icetSingleImageStrategy(ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC);
 
 	icetResetTiles();
 	icetAddTile(0, 0, width, height, 0);
@@ -230,12 +231,12 @@ auto main(int argc, char* argv[]) -> int try {
 			}}
 
 	auto  const num_local_layers {std::max<std::size_t>(local_layers.size(), 1)};
-	// float const max_layers       {static_cast<float>(argc - 3)};
+	float const max_layers       {static_cast<float>(argc - 3)};
 
 	// Combine local layers into a Layered Depth Image (LDI).
 	struct LdiFragment {
 		PixelData color;
-		// float     depth;
+		float     depth;
 		};
 
 	std::vector<LdiFragment> local_ldi (width * height * num_local_layers);
@@ -246,14 +247,14 @@ auto main(int argc, char* argv[]) -> int try {
 		for (ImageSize y {0}; y < std::min(height, layer.get_height()); ++y) {
 			for (ImageSize x {0}; x < std::min(width, layer.get_width()); ++x) {
 				auto& pixel    {reinterpret_cast<PixelData const&>(layer[y][x])};
-				auto& fragment {local_ldi[(y * width + x) * local_layers.size()]};
+				auto& fragment {local_ldi[(y * width + x) * local_layers.size() + layer_idx]};
 
 				for (auto i {0}; i < alpha_channel; ++i) {
 					fragment.color[i] = pixel[i] * pixel[alpha_channel] / channel_max;
 					}
 
 				fragment.color[alpha_channel] = pixel[alpha_channel];
-				// fragment.depth                = local_layers[layer_idx].depth / max_layers;
+				fragment.depth                = local_layers[layer_idx].depth / max_layers;
 				}}}
 
 	// Composite images from all ranks.
