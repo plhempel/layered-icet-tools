@@ -1,5 +1,6 @@
 #include <array>
 #include <concepts>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -246,16 +247,26 @@ auto main(int argc, char* argv[]) -> int try {
 
 		for (ImageSize y {0}; y < std::min(height, layer.get_height()); ++y) {
 			for (ImageSize x {0}; x < std::min(width, layer.get_width()); ++x) {
-				auto& pixel    {reinterpret_cast<PixelData const&>(layer[y][x])};
-				auto& fragment {local_ldi[(y * width + x) * local_layers.size() + layer_idx]};
+				auto& pixel      {reinterpret_cast<PixelData const&>(layer[y][x])};
+				auto& fragment   {local_ldi[(y * width + x) * local_layers.size() + layer_idx]};
+				auto const alpha {pixel[alpha_channel]};
 
 				for (auto i {0}; i < alpha_channel; ++i) {
-					fragment.color[i] = pixel[i] * pixel[alpha_channel] / channel_max;
+					fragment.color[i] = pixel[i] * alpha / channel_max;
 					}
 
-				fragment.color[alpha_channel] = pixel[alpha_channel];
-				fragment.depth                = local_layers[layer_idx].depth / max_layers;
+				fragment.color[alpha_channel] = alpha;
+				fragment.depth                = alpha == 0 ?
+					1 : local_layers[layer_idx].depth / max_layers;
 				}}}
+
+	// Store input data.
+	std::ofstream out_stream {concat("input-", proc_rank, ".raw"),  std::ios_base::binary};
+	out_stream.write(reinterpret_cast<char const*>(
+		local_ldi.data()),
+		local_ldi.size() * sizeof(LdiFragment)
+		);
+	out_stream.close();
 
 	// Composite images from all ranks.
 	std::array<IceTFloat, 4> const background {0, 0, 0, 0};
