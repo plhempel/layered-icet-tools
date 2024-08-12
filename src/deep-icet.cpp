@@ -199,7 +199,7 @@ auto main(int argc, char* argv[]) -> int try {
 
 	icetStrategy(ICET_STRATEGY_SEQUENTIAL);
 	icetSingleImageStrategy(ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC);
-	icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
+	icetCompositeMode(ICET_COMPOSITE_MODE_Z_BUFFER);
 
 	icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
 	icetSetDepthFormat(ICET_IMAGE_DEPTH_FLOAT);
