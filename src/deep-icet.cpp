@@ -261,7 +261,7 @@ auto main(int argc, char* argv[]) -> int try {
 				}}}
 
 	// Store input data.
-	std::ofstream out_stream {concat("input-", proc_rank, ".raw"),  std::ios_base::binary};
+	std::ofstream out_stream {concat("out/input-", proc_rank, ".raw"),  std::ios_base::binary};
 	out_stream.write(reinterpret_cast<char const*>(
 		local_ldi.data()),
 		local_ldi.size() * sizeof(LdiFragment)
