@@ -22,6 +22,13 @@ add_executable (blend
 target_compile_options (blend PRIVATE -Wall -Wextra -Wpedantic -Werror)
 target_link_libraries (blend common)
 
+# Target: compress.
+add_executable (compress
+	"src/compress.cpp"
+	)
+target_compile_options (compress PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_link_libraries (compress common)
+
 # Target: deep-icet.
 add_executable (deep-icet
 	"src/deep-icet.cpp"
@@ -57,10 +64,6 @@ if (ICET_USE_PARICOMPRESS)
 
 # Dependency: MPI.
 find_package (MPI REQUIRED COMPONENTS C CXX)
-target_link_libraries (deep-icet
-	MPI::MPI_C
-	MPI::MPI_CXX
-	)
 
 # Dependency: PNG.
 find_package (PNG REQUIRED)
@@ -75,14 +78,18 @@ list (APPEND FETCH_CONTENT_DEPS "png++")
 FetchContent_MakeAvailable ("${FETCH_CONTENT_DEPS}")
 
 # Use dependency: IceT.
-target_compile_definitions (IceTCore PRIVATE
+target_compile_definitions (IceTCore PUBLIC
 	ICET_COMPRESSED_IMAGE_OUT_FILE="out/compression-result.icet"
 	)
-target_include_directories (deep-icet PRIVATE
+target_include_directories (IceTCore PUBLIC
 	"${icet_SOURCE_DIR}/src/include"
 	"${icet_BINARY_DIR}/src/include"
 	)
-target_link_libraries (deep-icet
+target_link_libraries (IceTMPI
+	MPI::MPI_C
+	MPI::MPI_CXX
+	)
+target_link_libraries (common INTERFACE
 	IceTCore
 	IceTMPI
 	)
