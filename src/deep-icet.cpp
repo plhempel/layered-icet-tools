@@ -1,6 +1,7 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <unistd.h>
 
 #include "common.hpp"
 
@@ -22,6 +23,11 @@ auto main(int argc, char* argv[]) -> int try {
 		             "Usage: " << argv[0] << " <width> <height> [<rank>:<image>]...\n";
 		return EXIT_FAILURE;
 		}
+
+	// Redirect stdout to stderr so we can pipe the result image without interference from IceT's
+	// diagnostics.
+	auto const stdout {dup(STDOUT_FILENO)};
+	dup2(STDERR_FILENO, STDOUT_FILENO);
 
 	// Initialize MPI and retrieve configuration.
 	mpi::Runtime mpi     {&argc, &argv};
@@ -106,7 +112,7 @@ auto main(int argc, char* argv[]) -> int try {
 				}}}
 
 	// Store input data.
-	std::ofstream out_stream {concat("out/input-", proc_rank, ".raw"),  std::ios_base::binary};
+	std::ofstream out_stream {concat("out/input.", proc_rank, ".raw"),  std::ios_base::binary};
 	out_stream.write(reinterpret_cast<char const*>(
 		local_ldi.data()),
 		local_ldi.size() * sizeof(LdiFragment)
@@ -140,6 +146,10 @@ auto main(int argc, char* argv[]) -> int try {
 		};
 
 	if (proc_rank == 0) {
+		// Restore stdout.
+		dup2(stdout, STDOUT_FILENO);
+		close(stdout);
+
 		png::image_info info;
 		info.set_width(width);
 		info.set_height(height);
