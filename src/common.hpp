@@ -3,39 +3,63 @@
 #include <array>
 #include <concepts>
 #include <cstdint>
+#include <exception>
+#include <iostream>
 #include <limits>
+#include <memory>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <unistd.h>
 #include <utility>
+#include <vector>
 
 #include <IceT.h>
+#include <IceTDevCommunication.h>
+#include <IceTDevImage.h>
 #include <IceTMPI.h>
 
 #include <png.hpp>
 
 
+/// Functionality used by multiple deep-icet executables.
 namespace deep_icet {
 
 // Logging constants.
-std::string_view constexpr log_sev_info  {      "\x1b[1m[info]\x1b[m  "};
-std::string_view constexpr log_sev_warn  {   "\x1b[1;33m[warn]\x1b[m  "};
-std::string_view constexpr log_sev_error {   "\x1b[1;31m[error]\x1b[m "};
-std::string_view constexpr log_sev_fatal {"\x1b[1;30;41m[fatal]\x1b[m "};
+constexpr std::string_view log_sev_info  {      "\x1b[1m[info]\x1b[m  "};
+constexpr std::string_view log_sev_warn  {   "\x1b[1;33m[warn]\x1b[m  "};
+constexpr std::string_view log_sev_error {   "\x1b[1;31m[error]\x1b[m "};
+constexpr std::string_view log_sev_fatal {"\x1b[1;30;41m[fatal]\x1b[m "};
 
-std::string_view constexpr log_tag_egl    {"\x1b[1m[egl]\x1b[m "};
-std::string_view constexpr log_tag_glfw   {"\x1b[1m[glfw]\x1b[m "};
-std::string_view constexpr log_tag_opengl {"\x1b[1m[opengl]\x1b[m "};
 
 // Image format.
-using Channel   = uint8_t;
-using Pixel     = png::basic_rgba_pixel<Channel>;
-using PixelData = std::array<Channel, Pixel::traits::channels>;
-using Image     = png::image<Pixel, png::solid_pixel_buffer<Pixel>>;
-using ImageSize = decltype(std::declval<Image>().get_width());
+namespace color {
+using Channel = uint8_t;
 
-auto constexpr alpha_channel {Pixel::traits::channels - 1};
-auto constexpr channel_max   {std::numeric_limits<Channel>::max()};
+constexpr uint8_t alpha_channel {3};
+constexpr Channel max_value     {std::numeric_limits<Channel>::max()};
+};
+
+using Color    = std::array<color::Channel, 4>;
+using PngPixel = png::basic_rgba_pixel<color::Channel>;
+using Png      = png::image<PngPixel, png::solid_pixel_buffer<PngPixel>>;
+using PngSize  = decltype(std::declval<Png>().get_width());
+
+
+/// Cast between integer types, asserting that the given value can be represented in both.
+template<std::integral TTo, std::integral TFrom>
+constexpr auto int_cast(TFrom const& value) -> TTo {
+	using BitUnion = std::make_unsigned_t<std::common_type_t<TTo, TFrom>>;
+
+	// Assert that only bits shared between both types are set.
+	assert(static_cast<BitUnion>(value) < BitUnion{1} << std::min(
+			std::numeric_limits<TTo>::digits,
+			std::numeric_limits<TFrom>::digits
+			));
+
+	return static_cast<TTo>(value);
+	}
 
 
 /// Concatenate arguments into a string using a string stream for formatting.
@@ -58,7 +82,6 @@ public:
 	[[nodiscard]] constexpr Handle() noexcept = default;
 
 	Handle(Handle const&) = delete;
-
 	constexpr Handle(Handle&& src) noexcept
 		: _handle {std::move(src._handle)}
 		{
@@ -66,13 +89,14 @@ public:
 		}
 
 	auto operator=(Handle const&) = delete;
-
 	constexpr auto operator=(Handle&& src) noexcept -> Handle&
 		{
+		// Prevent deletion on self-assignment.
 		if (_handle == src._handle) {
 			return *this;
 			}
 
+		// Delete our current resource, then take ownership of the given handle.
 		this->~Handle();
 		_handle     = src._handle;
 		src._handle = {};
@@ -80,10 +104,8 @@ public:
 		}
 
 	~Handle() noexcept {
-		if (_handle != THandle{}) {
-			TDeleter{}(std::move(_handle));
-			_handle = {};
-			}}
+		TDeleter{}(std::move(_handle));
+		}
 
 
 	[[nodiscard]] auto constexpr operator==(Handle const& rhs) const noexcept -> bool {
@@ -91,14 +113,14 @@ public:
 		}
 
 	/// Return the raw handle.
-	[[nodiscard]] constexpr auto handle() const noexcept -> THandle const& {
+	[[nodiscard]] constexpr auto handle() const noexcept -> RawHandle const& {
 		return _handle;
 		}
 
 protected:
-	THandle _handle {};
+	RawHandle _handle {};
 
-	[[nodiscard]] constexpr explicit Handle(THandle&& handle) noexcept
+	[[nodiscard]] constexpr explicit Handle(RawHandle&& handle) noexcept
 		: _handle {std::move(handle)}
 		{}
 
@@ -109,42 +131,18 @@ protected:
 namespace mpi {
 
 /// Return the message associated with an MPI error code.
-inline auto error_message(int const error_code) noexcept -> std::string {
-	// Allocate memory to hold the message.
-	std::string msg (MPI_MAX_ERROR_STRING, '\0');
-	int length;
-
-	// Retrieve the message.
-	if (MPI_Error_string(error_code, msg.data(), &length)) {
-		// If no message could be found, return the error code directly.
-		return std::to_string(error_code);
-		}
-
-	// Trim excess characters.
-	msg.resize(length);
-
-	return msg;
-	}
-
+auto error_message(int const error_code) noexcept -> std::string;
 
 /// An RAII handle to the MPI execution environment.
-struct Runtime {
+struct Environment : Handle<
+		std::tuple<>,
+		decltype([](auto){MPI_Finalize();})
+		> {
 	/// MPI initialization.
-	[[nodiscard]] Runtime(int* argc = nullptr, char*** argv = nullptr) {
+	[[nodiscard]] Environment(int* argc = nullptr, char*** argv = nullptr) {
 		if (auto const error = MPI_Init(argc, argv)) {
 			throw std::runtime_error(concat("Could not initialize MPI: ", error_message(error)));
 			}}
-
-	Runtime(Runtime const&) = delete;
-	Runtime(Runtime&&) = delete;
-
-	auto operator=(Runtime const&) = delete;
-	auto operator=(Runtime&&) = delete;
-
-	/// MPI cleanup,
-	~Runtime() noexcept {
-		MPI_Finalize();
-		}
 
 	};
 
@@ -179,4 +177,161 @@ public:
 	};
 
 } // namespace icet
+
+
+/// Wraps a main function with pretty printing for exceptions.
+template<typename Fn>
+	requires std::is_invocable_r_v<int, Fn>
+auto try_main(Fn&& fn) -> int {
+	try {
+		return fn();
+		}
+	catch (std::exception const& error) {
+		std::cerr << log_sev_fatal << error.what() << "\n";
+		return EXIT_FAILURE;
+		}
+	catch (...) {
+		std::cerr << log_sev_fatal << "Unknown error\n";
+		return EXIT_FAILURE;
+		}}
+
+
+/// Provides a basic environment setup for programs using IceT.
+class Context {
+public:
+	[[nodiscard]] Context(int* argc, char*** argv);
+
+	/// Return the number of processes in the global MPI communicator.
+	[[nodiscard]] auto num_procs() const noexcept -> int {
+		return _com_size;
+		}
+
+	/// Return the rank of this process within the global MPI communicator.
+	[[nodiscard]] auto proc_rank() const noexcept -> int {
+		return _com_rank;
+		}
+
+	/// Return a file descriptor referring to `stdout` at the time of construction.
+	[[nodiscard]] auto stdout() const noexcept -> int {
+		return _stdout;
+		}
+
+	/// Redirect `stdout` to `stderr` so IceT's debug messages do not interfere with output data.
+	/// Called on construction.
+	auto stdout_to_stderr() noexcept -> void;
+
+	/// Replace `stdout` with its original file.
+	auto restore_stdout() noexcept -> void;
+
+private:
+	mpi::Environment   _mpi;
+	icet::Communicator _com      {MPI_COMM_WORLD};
+	icet::Context      _icet     {_com};
+	int                _com_size {icetCommSize()};
+	int                _com_rank {icetCommRank()};
+	int                _stdout   {STDOUT_FILENO};
+	};
+
+
+/// Uniquely ownes a contiguous sequence of elements.
+template<typename TElem>
+class UniqueSpan {
+public:
+	[[nodiscard]] constexpr UniqueSpan(std::size_t length)
+		: _data   {std::make_unique<TElem[]>(length)}
+		, _length {length}
+		{}
+
+	[[nodiscard]] constexpr auto data() const noexcept -> TElem* {
+		return _data.get();
+		}
+
+	[[nodiscard]] constexpr auto span() const noexcept -> std::span<TElem> {
+		return std::span{_data.get(), _length};
+		}
+
+private:
+	std::unique_ptr<TElem[]> _data;
+	std::size_t              _length;
+	};
+
+
+/// Read the entire contents of a binary file into a buffer.
+[[nodiscard]] auto read_all(FILE* in, std::size_t size_hint = 256) -> std::vector<std::byte>;
+
+/// Write a contiguous buffer to a binary file.
+template<typename T>
+auto write_binary(std::span<T const> buffer, FILE* out) -> void {
+	while (not buffer.empty()) {
+		buffer = buffer.subspan(fwrite(buffer.data(), sizeof(T), buffer.size(), out));
+
+		if (ferror(out)) {
+			throw std::runtime_error("Error writing to file");
+			}}}
+
+/// Write a contiguous `IceTImage` or `IceTSparseImage` to a binary file.
+auto write_image(IceTImage, FILE* out) -> void;
+auto write_image(IceTSparseImage, FILE* out) -> void;
+
+
+/// A fragment of a layered image.
+struct Fragment {
+	using Depth = float;
+
+	Color color;
+	Depth depth;
+	};
+
+/// Defines input required to construct a layer.
+struct InputLayer {
+	char const*     path;
+	Fragment::Depth depth;
+	};
+
+/// Layered fragments.
+class FragmentBuffer {
+public:
+	/// Build a fragment buffer by layering images.
+	/// Scales each fragment's color by its alpha value.
+	[[nodiscard]] FragmentBuffer(
+			IceTSizeType                width,
+			IceTSizeType                height,
+			std::span<InputLayer const> layers
+			);
+	[[nodiscard]] FragmentBuffer(FILE* in);
+
+	[[nodiscard]] constexpr auto width() const noexcept -> IceTSizeType {
+		return _width;
+		}
+
+	[[nodiscard]] constexpr auto height() const noexcept -> IceTSizeType {
+		return _height;
+		}
+
+	[[nodiscard]] constexpr auto num_layers() const noexcept -> IceTSizeType {
+		return _num_layers;
+		}
+
+	[[nodiscard]] constexpr auto fragments() noexcept -> std::span<Fragment> {
+		return {_fragments.get(), static_cast<std::size_t>(num_fragments())};
+		}
+
+	[[nodiscard]] constexpr auto fragments() const noexcept -> std::span<Fragment const> {
+		return {_fragments.get(), static_cast<std::size_t>(num_fragments())};
+		}
+
+	[[nodiscard]] constexpr auto num_fragments() const noexcept -> IceTSizeType {
+		return _width * _height * _num_layers;
+		}
+
+	/// Write dimensions and fragment data to a binary file.
+	auto write(FILE* out) const -> void;
+
+private:
+	IceTSizeType                _width      {0};
+	IceTSizeType                _height     {0};
+	IceTSizeType                _num_layers {0};
+	std::unique_ptr<Fragment[]> _fragments;
+	};
+
 } // namespace deep_icet

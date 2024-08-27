@@ -1,62 +1,57 @@
-#include <cstdlib>
-#include <iostream>
-
 #include "common.hpp"
 
 
-/// Blend PNG files front to back.
-/// Expected arguments: <width> <height> [<image>]...
-auto main(int const argc, char const* const argv[]) -> int try {
+/// Blend a layered fragment buffer, back to front, into a regular `IceTImage`.
+auto main(int argc, char* argv[]) -> int {
 	using namespace deep_icet;
+	return try_main([&]() {
 
-	// Parse output size.
-	ImageSize width, height;
+	// IceT setup.
+	Context ctx {&argc, &argv};
 
-	if (argc < 3
-			or (width  = atoi(argv[1])) == 0
-			or (height = atoi(argv[2])) == 0
-			) {
-		std::cerr << log_sev_fatal << "Invalid or missing arguments.\n"
-		             "Usage: " << argv[0] << " <width> <height> [<image>]...\n";
-		return EXIT_FAILURE;
+	// This program is not distributed.
+	if (ctx.proc_rank() != 0) {
+		return EXIT_SUCCESS;
 		}
 
-	// Allocate empty result image.
-	Image blend {width, height};
+	// Read input.
+	FragmentBuffer in_buffer {freopen(nullptr, "rb", stdin)};
 
-	// Add layers.
-	for (auto argi {3}; argi < argc; ++argi) {
-		// Read image.
-		Image const layer {argv[argi]};
+	// Allocate result image.
+	auto const out_image {icetGetStateBufferImage(
+			ICET_RENDER_BUFFER,
+			in_buffer.width(),
+			in_buffer.height()
+			)};
 
-		// Blend pixels using the over operator.
-		for (ImageSize y {0}; y < std::min(height, layer.get_height()); ++y) {
-			for (ImageSize x {0}; x < std::min(width, layer.get_width()); ++x) {
-				auto& blend_pixel {reinterpret_cast<PixelData&      >(blend[y][x])};
-				auto& layer_pixel {reinterpret_cast<PixelData const&>(layer[y][x])};
+	// Blend fragments.
+	auto in_pixel {in_buffer.fragments().begin()};
 
-				auto const transparency {channel_max - blend_pixel[alpha_channel]};
+	// For each pixel:
+	for (auto& out_color : std::span{
+			reinterpret_cast<Color*>(icetImageGetColorub(out_image)),
+			int_cast<std::size_t>(icetImageGetNumPixels(out_image))
+			}) {
+		// Initialize the output color to a black background.
+		out_color = {0, 0, 0, 0};
 
-				// Blend color channels scaled by opacity.
-				for (auto i {0}; i < alpha_channel; ++i) {
-					blend_pixel[i] += layer_pixel[i]
-					                  * layer_pixel[alpha_channel] / channel_max
-					                  * transparency               / channel_max;
-					}
+		// Iterate fragments back to front.
+		for (IceTSizeType layer_idx {in_buffer.num_layers()}; layer_idx-- > 0;) {
+			auto const in_color     {in_pixel[layer_idx].color};
+			auto const transparency {color::max_value - in_color[color::alpha_channel]};
 
-				// Blend alpha channel.
-				blend_pixel[alpha_channel] += layer_pixel[alpha_channel]
-				                              * transparency / channel_max;
-				}}}
+			// Blend color using the over-operator.
+			for (std::size_t i {0}; i < in_color.size(); ++i) {
+				out_color[i] = out_color[i] * transparency / color::max_value + in_color[i];
+				}}
 
-	// Write final image to stdout.
-	blend.write_stream(std::cout);
+		// Advance input iterator.
+		in_pixel += in_buffer.num_layers();
+		}
+
+	// Output result image.
+	icetImageAdjustForOutput(out_image);
+	write_image(out_image, fdopen(ctx.stdout(), "wb"));
+	return EXIT_SUCCESS;
+	});
 	}
-	catch (std::exception const& error) {
-		std::cerr << deep_icet::log_sev_fatal << error.what() << "\n";
-		return EXIT_FAILURE;
-		}
-	catch (...) {
-		std::cerr << deep_icet::log_sev_fatal << "Unknown error\n";
-		return EXIT_FAILURE;
-		}

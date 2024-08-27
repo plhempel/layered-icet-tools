@@ -1,87 +1,210 @@
 #!/usr/bin/make -f
 
-# Run IceT tests.
+# Run tests.
 
 
 # Check for required arguments.
-ifndef BUILD_DIR
-$(error Missing variable "BUILD_DIR", which must contain the path to CMake's build directory.)
+ifndef BUILD
+$(error Missing variable "BUILD", which must contain the path to CMake's build directory.)
 endif
 
 
-# Log output folder.
-OUT := out/test
-
-# Test cases per executable.
-ICET_CORE_TESTS := \
-	2:BackgroundCorrect \
-	2:CompressionSize \
-	2:FloatingViewport \
-	2:ImageConvert \
-	2:Interlace \
-	2:MaxImageSplit \
-	1:OddImageSizes \
-	8:OddProcessCounts \
-	1:PreRender \
-	2:RadixkrUnitTests \
-	2:RadixkUnitTests \
-	2:RenderEmpty \
-	2:SimpleTiming \
-	2:SparseImageCopy
-
-ICET_OPENGL_TESTS := \
-	2:BlankTiles \
-	2:BoundsBehindViewer \
-	2:DisplayNoDraw \
-	2:RandomTransform \
-	2:SimpleExample
-
-ICET_OPENGL3_TESTS := \
-	2:SimpleExampleOGL3
+# Configuration.
+.ONESHELL:
+.SUFFIXES:
 
 
-# Convert each word in the first argument to an IceT library, mapping e.g. "Core" to the path of
-# "libIceTCore.so" or "IceTCore.dll".
-icet_libs = $(foreach name,$1,$(wildcard $(BUILD_DIR)/_deps/icet-build/lib/*IceT$(name)*))
+# Determine the absolute path of the project directory so tests can be run from anywhere.
+ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))..)
 
-# Given a list of test cases, each of the format `<num_procs>:<name>`, return only the names of
-# the cases.
-test_names = $(foreach case,$1,$(lastword $(subst :, ,$(case))))
-# Given the name of a test case ($1), extract the number of processes configured for that case in a
-# given list ($2), whose entries are of the format `<num_procs>:<name>`.
-test_procs = $(firstword $(subst :, ,$(filter %:$1,$2)))
+# Version controlled resource directory.
+RES := $(ROOT)/res
 
+# Temporary output directory.
+OUT := $(ROOT)/out
 
-# Default target: Run all tests.
-all: icet-core icet-opengl icet-opengl3
-
-# Delete log files.
-clean:
-	@rm -r $(OUT)
-
-# Run tests.
-icet-core: $(patsubst %,$(OUT)/icet-core/%.log,$(call test_names,$(ICET_CORE_TESTS)))
-$(OUT)/icet-core/%.log: \
-		$(BUILD_DIR)/bin/icetTests_mpi \
-		$(call icet_libs,Core MPI) \
-		| $(OUT)/icet-core/
-	mpirun -n $(call test_procs,$*,$(ICET_CORE_TESTS)) --oversubscribe $< $* > $@ 2>&1
-
-icet-opengl: $(patsubst %,$(OUT)/icet-opengl/%.log,$(call test_names,$(ICET_OPENGL_TESTS)))
-$(OUT)/icet-opengl/%.log: \
-		$(BUILD_DIR)/bin/icetTests_mpi_opengl \
-		$(call icet_libs,Core MPI GL) \
-		| $(OUT)/icet-opengl/
-	mpirun -n $(call test_procs,$*,$(ICET_OPENGL_TESTS)) --oversubscribe $< $* > $@ 2>&1
-
-icet-opengl3: $(patsubst %,$(OUT)/icet-opengl3/%.log,$(call test_names,$(ICET_OPENGL3_TESTS)))
-$(OUT)/icet-opengl3/%.log: \
-		$(BUILD_DIR)/bin/icetTests_mpi_opengl3 \
-		$(call icet_libs,Core MPI GL3) \
-		| $(OUT)/icet-opengl3/
-	mpirun -n $(call test_procs,$*,$(ICET_OPENGL3_TESTS)) --oversubscribe $< $* > $@ 2>&1
-
-# Create output directory.
-$(OUT)/%/:
+# Create subdirectories for test output.
+$(OUT)/test/%/:
 	@mkdir -p $@
-.PRECIOUS: $(OUT)/%/
+
+
+# Tracks all defined test cases.
+TESTS :=
+
+# Add a test case.
+# Arguments: name, prerequisites, recipe
+define test_case
+$(eval
+# Register the test.
+TESTS += $1
+
+# Invoke test by name.
+$1: $(OUT)/test/$1.log
+
+# Local variables.
+$1: ERR := $(OUT)/test/$1.err
+
+# Run the test.
+$(OUT)/test/$1.log: $2 | $(dir $(OUT)/test/$1)
+	@printf '\e[1mRun\e[m $1\n'
+	{ $3; } >$$@ 2>&1 \
+	&& { rm -f $$(ERR);  printf '\e[1;32mOk\e[m  $$@\n'; } \
+	|| { mv $$@ $$(ERR); printf '\e[1;31mErr\e[m $$(ERR)\n'; }
+)
+endef
+
+
+# IceT libraries.
+ICET_COMMON := $(wildcard $(BUILD)/lib/*IceTCore.* $(BUILD)/lib/*IceTMPI.*)
+ICET_GL     := $(ICET_COMMON) $(wildcard $(BUILD)/lib/*IceTGL.*)
+ICET_GL3    := $(ICET_GL)
+
+
+# Add a test case provided by IceT.
+# Arguments: exe suffix (after `icetTests_`), library names, name, number of processes
+test_icet = $(call test_case,icet/$1/$3,\
+	$(BUILD)/bin/icetTests_$1 $2,\
+	mpirun -n $4 --oversubscribe $$< $3\
+	)
+
+
+test_icet_mpi = $(call test_icet,mpi,$(ICET_COMMON),$1,$2)
+
+$(call test_icet_mpi,BackgroundCorrect,2)
+$(call test_icet_mpi,CompressionSize,2)
+$(call test_icet_mpi,FloatingViewport,2)
+$(call test_icet_mpi,ImageConvert,2)
+$(call test_icet_mpi,Interlace,2)
+$(call test_icet_mpi,MaxImageSplit,2)
+$(call test_icet_mpi,OddImageSizes,1)
+$(call test_icet_mpi,OddProcessCounts,8)
+$(call test_icet_mpi,PreRender,1)
+$(call test_icet_mpi,RadixkrUnitTests,2)
+$(call test_icet_mpi,RadixkUnitTests,2)
+$(call test_icet_mpi,SimpleTiming,2)
+$(call test_icet_mpi,SparseImageCopy,2)
+
+
+test_icet_mpi_opengl = $(call test_icet,mpi_opengl,$(ICET_GL),$1,$2)
+
+$(call test_icet_mpi_opengl,BlankTiles,2)
+$(call test_icet_mpi_opengl,BoundsBehindViewer,2)
+$(call test_icet_mpi_opengl,DisplayNoDraw,2)
+$(call test_icet_mpi_opengl,RandomTransform,2)
+$(call test_icet_mpi_opengl,SimpleExample,2)
+
+
+test_icet_mpi_opengl3 = $(call test_icet,mpi_opengl3,$(ICET_GL3),$1,$2)
+
+$(call test_icet_mpi_opengl3,SimpleExampleOGL3,2)
+
+
+# Define a layered test image.
+# Arguments: name, size, layers
+define layer
+$(eval
+# Local variables.
+$(OUT)/test/img/$1.frags: IN_FILES := $(3:%=$(RES)/img/%.png)
+
+# Generate the fragment buffer.
+$(OUT)/test/img/$1.frags: $(BUILD)/bin/layer $$(IN_FILES) | $(dir $(OUT)/test/img/$1)
+	@$$< $2 $$(IN_FILES) > $$@ 2> $$@.err && rm $$@.err || rm $$@
+)
+endef
+
+# Reference solution for image compression.
+$(OUT)/test/img/%.sparse: $(BUILD)/bin/compress $(ICET_COMMON) $(OUT)/test/img/%.frags
+	@$< < $(OUT)/test/img/$*.frags > $@ 2> $@.err && rm $@.err || rm $@
+
+# Reference solution for image blending.
+$(OUT)/test/img/%.blend: $(BUILD)/bin/blend $(ICET_COMMON) $(OUT)/test/img/%.frags
+	@$< < $(OUT)/test/img/$*.frags > $@ 2> $@.err && rm $@.err || rm $@
+
+
+# Add a test case for image compression.
+# Arguments: name
+define test_compress
+$(eval
+# Local variables.
+compress/$1: OUT_FILE := $(OUT)/test/compress/$1.out
+
+# Compress with IceT, then check against referene solution.
+$(call test_case,compress/$1, \
+	$(BUILD)/bin/icet-compress $(ICET_COMMON) $(OUT)/test/img/$1.sparse, \
+	$$< < $(OUT)/test/img/$1.frags > $$(OUT_FILE) \
+		&& cmp $$(OUT_FILE) $(OUT)/test/img/$1.sparse \
+		&& rm $$(OUT_FILE) \
+	)
+)
+endef
+
+# Add a test case for image decompression.
+# Arguments: name
+define test_decompress
+$(eval
+# Local variables.
+decompress/$1: OUT_FILE := $(OUT)/test/decompress/$1.out
+
+# Decompress with IceT, then check against referene solution.
+$(call test_case,decompress/$1, \
+	$(BUILD)/bin/icet-decompress $(ICET_COMMON) $(OUT)/test/img/$1.sparse $(OUT)/test/img/$1.blend, \
+	$$< < $(OUT)/test/img/$1.sparse > $$(OUT_FILE) \
+		&& cmp $$(OUT_FILE) $(OUT)/test/img/$1.blend \
+		&& rm $$(OUT_FILE) \
+	)
+)
+endef
+
+# Add test cases for compressing and decompressing an image.
+# Arguments: name, size, layers
+define test_image
+$(call layer,$1,$2,$3)
+$(call test_compress,$1)
+$(call test_decompress,$1)
+endef
+
+$(call test_image,diag/r,5 5,diag/red)
+$(call test_image,diag/rg,5 5,diag/red diag/green)
+$(call test_image,diag/rgb,5 5,diag/red diag/green diag/blue)
+
+
+# Add a test case for distributed blending with IceT.
+# Arguments: name, number of processes, image size, layers, layer ranks
+define test_blend
+$(eval
+# Local variables.
+blend/$1: IN_FILES := $(4:%=$(RES)/img/%.png)
+blend/$1: OUT_NAME := $(OUT)/test/blend/$1
+)
+
+$(call test_case,blend/$1, \
+	$(BUILD)/bin/icet-blend \
+		$(BUILD)/bin/blend \
+		$(ICET_COMMON) \
+		$$(IN_FILES), \
+	mpirun -n $2 --oversubscribe $$< $3 $$(join $(5:%=%:),$$(IN_FILES)) > $$(OUT_NAME).out \
+		&& { $(BUILD)/bin/layer $3 $$(IN_FILES) | $(BUILD)/bin/blend > $$(OUT_NAME).ref; } \
+		&& cmp $$(OUT_NAME).out $$(OUT_NAME).ref \
+		&& rm $$(OUT_NAME).out $$(OUT_NAME).ref \
+	)
+endef
+
+$(call test_blend,diag/rgb,1,5 5,diag/red diag/green diag/blue,0 0 0)
+
+
+# If no target is selected, run all tests.
+all: $(TESTS)
+.DEFAULT_GOAL := all
+
+# Delete files generated by tests.
+clean:
+	@rm -rf $(OUT)/test/
+
+
+.SECONDEXPANSION:
+# Workaround to use patterns in the second expansion of pattern rule prerequisites.
+_ := %
+
+# Run all tests of a group.
+%/: $$(filter $$@$$_,$$(TESTS))
+	@:
