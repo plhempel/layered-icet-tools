@@ -15,7 +15,7 @@ auto main(int argc, char* argv[]) -> int {
 		}
 
 	// Read input.
-	FragmentBuffer in_buffer {freopen(nullptr, "rb", stdin)};
+	RawImage in_buffer {freopen(nullptr, "rb", stdin)};
 
 	// Allocate result image.
 	auto const out_image {icetGetStateBufferImage(
@@ -25,11 +25,11 @@ auto main(int argc, char* argv[]) -> int {
 			)};
 
 	// Blend fragments.
-	auto in_pixel {in_buffer.fragments().begin()};
+	auto in_pixel {in_buffer.color().begin()};
 
 	// For each pixel:
 	for (auto& out_color : std::span{
-			reinterpret_cast<Color*>(icetImageGetColorub(out_image)),
+			reinterpret_cast<Color*>(icetImageGetColorVoid(out_image, nullptr)),
 			int_cast<std::size_t>(icetImageGetNumPixels(out_image))
 			}) {
 		// Initialize the output color to a black background.
@@ -37,12 +37,12 @@ auto main(int argc, char* argv[]) -> int {
 
 		// Iterate fragments back to front.
 		for (IceTSizeType layer_idx {in_buffer.num_layers()}; layer_idx-- > 0;) {
-			auto const in_color     {in_pixel[layer_idx].color};
-			auto const transparency {color::max_value - in_color[color::alpha_channel]};
+			auto const in_color     {in_pixel[layer_idx]};
+			auto const transparency {color::channel_max - in_color[color::alpha_channel]};
 
 			// Blend color using the over-operator.
 			for (std::size_t i {0}; i < in_color.size(); ++i) {
-				out_color[i] = out_color[i] * transparency / color::max_value + in_color[i];
+				out_color[i] = out_color[i] * transparency / color::channel_max + in_color[i];
 				}}
 
 		// Advance input iterator.

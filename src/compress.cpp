@@ -45,7 +45,7 @@ auto main(int argc, char* argv[]) -> int {
 		}
 
 	// Read input.
-	FragmentBuffer const in_buffer {freopen(nullptr, "rb", stdin)};
+	RawImage const in_buffer {freopen(nullptr, "rb", stdin)};
 
 	// Allocate result image.
 	UniqueSpan<std::byte> const out_buffer {int_cast<std::size_t>(icetSparseLayeredImageBufferSize(
@@ -65,23 +65,21 @@ auto main(int argc, char* argv[]) -> int {
 	auto         prev_pixel_active {false};
 
 	// For each pixel:
-	for (
-		auto in_pixel {in_buffer.fragments().begin()};
-		in_pixel != in_buffer.fragments().end();
-		in_pixel += in_buffer.num_layers()
-		) {
-		std::cerr << ".";
+	for (IceTSizeType frag_idx {0}; frag_idx < in_buffer.num_fragments();) {
 		// Leave room to count the active fragments in this pixel.
 		auto& num_frags {out.push<IceTLayerCount>(0)};
 
 		// For each layer:
-		for (IceTSizeType layer_idx {0}; layer_idx < in_buffer.num_layers(); ++layer_idx) {
-			auto const& frag  {in_pixel[layer_idx]};
-			auto const  alpha {frag.color[color::alpha_channel]};
+		auto const frag_end {frag_idx + in_buffer.num_layers()};
+
+		for (; frag_idx != frag_end; ++frag_idx) {
+			auto const& in_color {in_buffer.color()[frag_idx]};
+			auto const  alpha    {in_color[color::alpha_channel]};
 
 			// Copy and count active fragments.
 			if (alpha != 0) {
-				out.push(frag);
+				out.push(in_color);
+				out.push(in_buffer.depth()[frag_idx]);
 				++num_frags;
 				}}
 

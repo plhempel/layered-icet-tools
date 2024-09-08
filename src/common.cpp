@@ -107,15 +107,16 @@ auto write_image(IceTSparseImage const image, FILE* const out) -> void {
 	}
 
 
-FragmentBuffer::FragmentBuffer(
+RawImage::RawImage(
 		IceTSizeType const          width,
 		IceTSizeType const          height,
 		std::span<InputLayer const> layers
 		)
-		: _width      {width}
-		, _height     {height}
-		, _num_layers {int_cast<IceTSizeType>(layers.size())}
-		, _fragments  {new Fragment[num_fragments()]}
+		: _width        {width}
+		, _height       {height}
+		, _num_layers   {int_cast<IceTSizeType>(layers.size())}
+		, _color_buffer {std::make_unique<Color[]>(num_fragments())}
+		, _depth_buffer {std::make_unique<Depth[]>(num_fragments())}
 		{
 	// For each layer:
 	for (std::size_t layer_idx {0}; layer_idx < layers.size(); ++layer_idx) {
@@ -127,34 +128,37 @@ FragmentBuffer::FragmentBuffer(
 		for (IceTSizeType y {0}; y < std::min(height, png_height); ++y) {
 			for (IceTSizeType x {0}; x < std::min(width, png_width); ++x) {
 				// Copy color, scaled by alpha,
-				auto const& color    {reinterpret_cast<Color const&>(png[y][x])};
-				auto&       fragment {_fragments[(y * width + x) * layers.size() + layer_idx]};
-				auto const  alpha    {color[color::alpha_channel]};
+				auto const& color   {reinterpret_cast<Color const&>(png[y][x])};
+				auto const  alpha   {color[color::alpha_channel]};
+				auto const  out_idx {(y * width + x) * _num_layers + layer_idx};
 
-				for (auto i {0}; i < color::alpha_channel; ++i) {
-					fragment.color[i] = color[i] * alpha / color::max_value;
+				for (std::size_t i {0}; i < color.size(); ++i) {
+					_color_buffer[out_idx][i] = color[i] * alpha / color::channel_max;
 					}
 
-				fragment.color[color::alpha_channel] = alpha;
+				_color_buffer[out_idx][color::alpha_channel] = alpha;
 
 				// Set depth, with empty fragments marked as background.
-				fragment.depth = alpha == 0 ? 1 : layers[layer_idx].depth;
+				_depth_buffer[out_idx] = alpha == 0 ? 1 : layers[layer_idx].depth;
 				}}}}
 
-FragmentBuffer::FragmentBuffer(FILE* const in) {
+RawImage::RawImage(FILE* const in) {
 	// Read size.
 	read_binary(in, std::span{&_width, 3});
 
-	// Allocate buffer.
-	_fragments = std::make_unique<Fragment[]>(num_fragments());
+	// Allocate buffers.
+	_color_buffer = std::make_unique<Color[]>(num_fragments());
+	_depth_buffer = std::make_unique<Depth[]>(num_fragments());
 
 	// Read fragment data.
-	read_binary(in, fragments());
+	read_binary(in, std::span{_color_buffer.get(), static_cast<std::size_t>(num_fragments())});
+	read_binary(in, std::span{_depth_buffer.get(), static_cast<std::size_t>(num_fragments())});
 	}
 
-auto FragmentBuffer::write(FILE* out) const -> void {
+auto RawImage::write(FILE* out) const -> void {
 	write_binary(std::span{&_width, 3}, out);
-	write_binary(fragments(), out);
+	write_binary(color(), out);
+	write_binary(depth(), out);
 	}
 
 } // namespace deep_icet

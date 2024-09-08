@@ -38,13 +38,14 @@ namespace color {
 using Channel = uint8_t;
 
 constexpr uint8_t alpha_channel {3};
-constexpr Channel max_value     {std::numeric_limits<Channel>::max()};
+constexpr Channel channel_max   {std::numeric_limits<Channel>::max()};
 };
 
 using Color    = std::array<color::Channel, 4>;
 using PngPixel = png::basic_rgba_pixel<color::Channel>;
 using Png      = png::image<PngPixel, png::solid_pixel_buffer<PngPixel>>;
 using PngSize  = decltype(std::declval<Png>().get_width());
+using Depth    = float;
 
 
 /// Cast between integer types, asserting that the given value can be represented in both.
@@ -274,31 +275,25 @@ auto write_image(IceTImage, FILE* out) -> void;
 auto write_image(IceTSparseImage, FILE* out) -> void;
 
 
-/// A fragment of a layered image.
-struct Fragment {
-	using Depth = float;
-
-	Color color;
-	Depth depth;
-	};
-
 /// Defines input required to construct a layer.
 struct InputLayer {
-	char const*     path;
-	Fragment::Depth depth;
+	char const* path;
+	Depth       depth;
 	};
 
-/// Layered fragments.
-class FragmentBuffer {
+/// A raw layered image.
+/// Can be written to and read from a file.
+class RawImage {
 public:
-	/// Build a fragment buffer by layering images.
+	/// Build an image by layering PNGs.
 	/// Scales each fragment's color by its alpha value.
-	[[nodiscard]] FragmentBuffer(
+	[[nodiscard]] RawImage(
 			IceTSizeType                width,
 			IceTSizeType                height,
 			std::span<InputLayer const> layers
 			);
-	[[nodiscard]] FragmentBuffer(FILE* in);
+	/// Load an image from a file written by `RawImage::write`.
+	[[nodiscard]] RawImage(FILE* in);
 
 	[[nodiscard]] constexpr auto width() const noexcept -> IceTSizeType {
 		return _width;
@@ -312,12 +307,12 @@ public:
 		return _num_layers;
 		}
 
-	[[nodiscard]] constexpr auto fragments() noexcept -> std::span<Fragment> {
-		return {_fragments.get(), static_cast<std::size_t>(num_fragments())};
+	[[nodiscard]] constexpr auto color() const noexcept -> std::span<Color const> {
+		return {_color_buffer.get(), static_cast<std::size_t>(num_fragments())};
 		}
 
-	[[nodiscard]] constexpr auto fragments() const noexcept -> std::span<Fragment const> {
-		return {_fragments.get(), static_cast<std::size_t>(num_fragments())};
+	[[nodiscard]] constexpr auto depth() const noexcept -> std::span<Depth const> {
+		return {_depth_buffer.get(), static_cast<std::size_t>(num_fragments())};
 		}
 
 	[[nodiscard]] constexpr auto num_fragments() const noexcept -> IceTSizeType {
@@ -328,10 +323,11 @@ public:
 	auto write(FILE* out) const -> void;
 
 private:
-	IceTSizeType                _width      {0};
-	IceTSizeType                _height     {0};
-	IceTSizeType                _num_layers {0};
-	std::unique_ptr<Fragment[]> _fragments;
+	IceTSizeType             _width      {0};
+	IceTSizeType             _height     {0};
+	IceTSizeType             _num_layers {0};
+	std::unique_ptr<Color[]> _color_buffer;
+	std::unique_ptr<Depth[]> _depth_buffer;
 	};
 
 } // namespace deep_icet

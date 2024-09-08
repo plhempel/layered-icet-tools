@@ -26,8 +26,8 @@ auto main(int argc, char* argv[]) -> int {
 		in_layers.span()[i] = {argv[i + 3], static_cast<float>(i) / (argc - 3)};
 		}
 
-	// Construct a layered fragment buffer from input images.
-	FragmentBuffer const out_buffer {width, height, in_layers.span()};
+	// Construct a raw layered image from input images.
+	RawImage const out_buffer {width, height, in_layers.span()};
 
 	// Output the image.
 	out_buffer.write(freopen(nullptr, "wb", stdout));

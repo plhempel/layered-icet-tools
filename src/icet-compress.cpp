@@ -15,14 +15,15 @@ auto main(int argc, char* argv[]) -> int {
 		}
 
 	// Read input.
-	FragmentBuffer const in_buffer {freopen(nullptr, "rb", stdin)};
+	RawImage const in_buffer {freopen(nullptr, "rb", stdin)};
 
 	auto const in_image {icetGetStatePointerLayeredImage(
 			ICET_RENDER_BUFFER,
 			in_buffer.width(),
 			in_buffer.height(),
 			in_buffer.num_layers(),
-			in_buffer.fragments().data()
+			in_buffer.color().data(),
+			in_buffer.depth().data()
 			)};
 
 	// Allocate output image.

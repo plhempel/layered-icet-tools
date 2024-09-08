@@ -104,21 +104,21 @@ $(call test_icet_mpi_opengl3,SimpleExampleOGL3,2)
 define layer
 $(eval
 # Local variables.
-$(OUT)/res/img/$1.frags: IN_FILES := $(3:%=$(RES)/img/%.png)
+$(OUT)/res/img/$1.raw: IN_FILES := $(3:%=$(RES)/img/%.png)
 
 # Generate the fragment buffer.
-$(OUT)/res/img/$1.frags: $(BUILD)/bin/layer $$(IN_FILES) | $(dir $(OUT)/res/img/$1)
+$(OUT)/res/img/$1.raw: $(BUILD)/bin/layer $$(IN_FILES) | $(dir $(OUT)/res/img/$1)
 	@$$< $2 $$(IN_FILES) > $$@ 2> $$@.err && rm $$@.err || rm $$@
 )
 endef
 
 # Reference solution for image compression.
-$(OUT)/res/img/%.sparse: $(BUILD)/bin/compress $(ICET_COMMON) $(OUT)/res/img/%.frags
-	@$< < $(OUT)/res/img/$*.frags > $@ 2> $@.err && rm $@.err || rm $@
+$(OUT)/res/img/%.sparse: $(BUILD)/bin/compress $(ICET_COMMON) $(OUT)/res/img/%.raw
+	@$< < $(OUT)/res/img/$*.raw > $@ 2> $@.err && rm $@.err || rm $@
 
 # Reference solution for image blending.
-$(OUT)/res/img/%.blend: $(BUILD)/bin/blend $(ICET_COMMON) $(OUT)/res/img/%.frags
-	@$< < $(OUT)/res/img/$*.frags > $@ 2> $@.err && rm $@.err || rm $@
+$(OUT)/res/img/%.blend: $(BUILD)/bin/blend $(ICET_COMMON) $(OUT)/res/img/%.raw
+	@$< < $(OUT)/res/img/$*.raw > $@ 2> $@.err && rm $@.err || rm $@
 
 
 # Add a test case for image compression.
@@ -131,7 +131,7 @@ img/compress/$1: OUT_FILE := $(OUT)/img/compress/$1.out
 # Compress with IceT, then check against referene solution.
 $(call test_case,img/compress/$1, \
 	$(BUILD)/bin/icet-compress $(ICET_COMMON) $(OUT)/res/img/$1.sparse, \
-	$$< < $(OUT)/res/img/$1.frags > $$(OUT_FILE) \
+	$$< < $(OUT)/res/img/$1.raw > $$(OUT_FILE) \
 		&& cmp $$(OUT_FILE) $(OUT)/res/img/$1.sparse \
 		&& rm $$(OUT_FILE) \
 	)

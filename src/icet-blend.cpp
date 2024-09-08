@@ -50,12 +50,13 @@ auto main(int argc, char* argv[]) -> int {
 			}}
 
 	// Assemble layers assigned to this rank into a fragment buffer.
-	FragmentBuffer in_buffer {width, height, in_layers.span().first(num_layers)};
+	RawImage in_buffer {width, height, in_layers.span().first(num_layers)};
 
 	// Composite fragments from all ranks.
 	std::array<IceTFloat, 4> const background {0, 0, 0, 0};
 	auto const out_image {icetCompositeImageLayered(
-			in_buffer.fragments().data(),
+			in_buffer.color().data(),
+			in_buffer.depth().data(),
 			in_buffer.num_layers(),
 			nullptr,
 			nullptr,
