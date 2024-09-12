@@ -1,0 +1,25 @@
+%{#include <IceT.h>
+
+namespace deep_icet {
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+%}
+
+struct IcetStrategy {
+	char const* name;
+	IceTEnum    key;
+	bool        uses_single_image_strategy;
+	};
+
+%%
+direct,     ICET_STRATEGY_DIRECT,     false
+sequential, ICET_STRATEGY_SEQUENTIAL, true
+split,      ICET_STRATEGY_SPLIT,      false
+reduce,     ICET_STRATEGY_REDUCE,     true
+vtree,      ICET_STRATEGY_VTREE,      false
+%%
+#pragma GCC diagnostic pop
+
+} // namespace deep_icet

@@ -1,8 +1,11 @@
 #include "common.hpp"
 
+#include <strategy-hash.hpp>
+#include <single-image-strategy-hash.hpp>
+
 
 /// Use IceT to blend PNG images front to back.
-/// Expected arguments: <width> <height> [<rank>:<image>]...
+/// Expected arguments: <width> <height> <strategy>[.<single-image-strategy>] [<rank>:<image>]...
 auto main(int argc, char* argv[]) -> int {
 	using namespace deep_icet;
 	return try_main([&]() {
@@ -10,20 +13,54 @@ auto main(int argc, char* argv[]) -> int {
 	// Parse output size.
 	IceTSizeType width, height;
 
-	if (argc < 3
+	if (argc < 4
 			or (width  = atoi(argv[1])) == 0
 			or (height = atoi(argv[2])) == 0
 			) {
 		std::cerr << log_sev_fatal << "Invalid or missing arguments.\n"
-		             "Usage: " << argv[0] << " <width> <height> [<fragments>]...\n";
+		             "Usage: " << argv[0] << " <width> <height> "
+		             "<strategy>[.<single-image-strategy>] [<rank>:<image>]...\n";
 		return EXIT_FAILURE;
+		}
+
+	// Parse strategy.
+	std::string_view const strategy_name {argv[3], std::strchr(argv[3], '.')};
+	auto const             strategy      {
+			StrategyTable::find(strategy_name.data(), strategy_name.size())};
+
+	if (not strategy) {
+		std::cerr << log_sev_fatal << "Unknown compositing strategy `" << strategy_name << "`.\n";
+		return EXIT_FAILURE;
+		}
+
+	// Parse single image strategy if used.
+	auto single_image_strategy {ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC};
+
+	if (strategy->uses_single_image_strategy) {
+		if (*strategy_name.end() != '.') {
+			std::cerr << "The selected compositing strategy requires a single image compositing "
+			             "strategy to be specified.\n";
+			return EXIT_FAILURE;
+			}
+
+		std::string_view const si_strategy_name {strategy_name.end() + 1};
+		auto const             si_strategy      {
+				SingleImageStrategyTable::find(si_strategy_name.data(), si_strategy_name.size())};
+
+		if (not si_strategy) {
+			std::cerr << log_sev_fatal << "Unknown single image compositing strategy `"
+			          << si_strategy_name << "`.\n";
+			return EXIT_FAILURE;
+			}
+
+		single_image_strategy = si_strategy->key;
 		}
 
 	// IceT setup.
 	Context ctx {&argc, &argv};
 
-	icetStrategy(ICET_STRATEGY_SEQUENTIAL);
-	icetSingleImageStrategy(ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC);
+	icetStrategy(strategy->key);
+	icetSingleImageStrategy(single_image_strategy);
 
 	icetResetTiles();
 	icetAddTile(0, 0, width, height, 0);
@@ -32,7 +69,7 @@ auto main(int argc, char* argv[]) -> int {
 	UniqueSpan<InputLayer> const in_layers  {int_cast<std::size_t>(argc - 3)};
 	std::size_t                  num_layers {0};
 
-	for (auto argi {3}; argi < argc; ++argi) {
+	for (auto argi {4}; argi < argc; ++argi) {
 		char* parse_ptr;
 
 		// Parse rank.

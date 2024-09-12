@@ -1,0 +1,24 @@
+%{#include <IceT.h>
+
+namespace deep_icet {
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+%}
+
+struct SingleImageStrategy {
+	char const* name;
+	IceTEnum    key;
+	};
+
+%%
+bswap,         ICET_SINGLE_IMAGE_STRATEGY_BSWAP
+tree,          ICET_SINGLE_IMAGE_STRATEGY_TREE
+radixk,        ICET_SINGLE_IMAGE_STRATEGY_RADIXK
+radixkr,       ICET_SINGLE_IMAGE_STRATEGY_RADIXKR
+bswap-folding, ICET_SINGLE_IMAGE_STRATEGY_BSWAP_FOLDING
+%%
+#pragma GCC diagnostic pop
+
+} // namespace deep_icet

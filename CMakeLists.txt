@@ -18,10 +18,22 @@ add_library (common
 	)
 target_compile_options (common PUBLIC -Wall -Wextra -Wpedantic -Werror)
 
-# basic setup for project executable targets.
+# Basic setup for project executable targets.
 function (deep_icet_exe NAME)
 	add_executable ("${NAME}" "src/${NAME}.cpp")
+	target_include_directories ("${NAME}" PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/src")
 	target_link_libraries ("${NAME}" common)
+	endfunction ()
+
+# Generate a lookup table for compositing strategy names using perfect hashing.
+function (strategy_lookup FILE CLASS)
+	add_custom_command(
+		OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp"
+		COMMAND gperf "${CMAKE_CURRENT_SOURCE_DIR}/res/${FILE}.gperf" -L C++ -N find -Z ${CLASS}
+		              -S 1 -tlcCEID > "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp"
+		DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/res/${FILE}.gperf"
+		)
+	target_sources (icet-blend PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp")
 	endfunction ()
 
 # Project executables.
@@ -32,6 +44,9 @@ deep_icet_exe (icet-compress)
 deep_icet_exe (icet-decompress)
 deep_icet_exe (icet-to-png)
 deep_icet_exe (layer)
+
+strategy_lookup (strategy-hash              StrategyTable)
+strategy_lookup (single-image-strategy-hash SingleImageStrategyTable)
 
 # Tracks dependencies to be downloaded.
 set (FETCH_CONTENT_DEPS)

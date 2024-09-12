@@ -168,13 +168,14 @@ $(call test_image,diag/rg,5 5,diag/red diag/green)
 $(call test_image,diag/rgb,5 5,diag/red diag/green diag/blue)
 
 
-# Add a test case for distributed blending with IceT.
-# Arguments: name, number of processes, image size, layers, layer ranks
-define test_blend
+# Add a test case for image blending with IceT using a specific compositing strategy.
+# Arguments: name, number of processes, image size, strategy, layers, layer ranks
+define test_blend_strategy
 $(eval
 # Local variables.
-img/blend/$1: IN_FILES := $(4:%=$(RES)/img/%.png)
-img/blend/$1: OUT_NAME := $(OUT)/img/blend/$1
+img/blend/$1: IN_FILES := $(5:%=$(RES)/img/%.png)
+img/blend/$1: REF_FILE := $(OUT)/img/blend/$1.ref
+img/blend/$1: OUT_FILE := $(OUT)/img/blend/$1.$4.out
 )
 
 $(call test_case,img/blend/$1, \
@@ -182,14 +183,31 @@ $(call test_case,img/blend/$1, \
 		$(BUILD)/bin/blend \
 		$(ICET_COMMON) \
 		$$(IN_FILES), \
-	mpirun -n $2 --oversubscribe $$< $3 $$(join $(5:%=%:),$$(IN_FILES)) > $$(OUT_NAME).out \
-		&& { $(BUILD)/bin/layer $3 $$(IN_FILES) | $(BUILD)/bin/blend > $$(OUT_NAME).ref; } \
-		&& cmp $$(OUT_NAME).out $$(OUT_NAME).ref \
-		&& rm $$(OUT_NAME).out $$(OUT_NAME).ref \
+	mpirun -n $2 --oversubscribe $$< $3 $4 $$(join $(6:%=%:),$$(IN_FILES)) > $$(OUT_FILE) \
+		&& { $(BUILD)/bin/layer $3 $$(IN_FILES) | $(BUILD)/bin/blend > $$(REF_FILE); } \
+		&& cmp $$(OUT_FILE) $$(REF_FILE) \
+		&& rm $$(OUT_File) $$(REF_FILE) \
+	)
+endef
+
+# The names of IceT's single image compositing strategies as expected by `icet-blend`.
+SINGLE_IMAGE_STRATEGIES := bswap tree radixk radixkr bswap-folding
+
+# Add a test case for image blending with IceT using all compositing strategies.
+# Arguments: name, number of processes, image size, layers, layer ranks
+define test_blend
+$(foreach strategy,\
+	direct \
+		$(SINGLE_IMAGE_STRATEGIES:%=sequential.%)\
+		split \
+		$(SINGLE_IMAGE_STRATEGIES:%=reduce.%)\
+		vtree,\
+	$(call test_blend_strategy,$1.$(strategy),$2,$3,$(strategy),$4,$5)\
 	)
 endef
 
 $(call test_blend,diag/rgb,1,5 5,diag/red diag/green diag/blue,0 0 0)
+$(call test_blend,diag/r0g1b0,2,5 5,diag/red diag/green diag/blue,0 1 0)
 
 
 # If no target is selected, run all tests.
