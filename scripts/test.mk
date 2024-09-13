@@ -169,25 +169,24 @@ $(call test_image,diag/rgb,5 5,diag/red diag/green diag/blue)
 
 
 # Add a test case for image blending with IceT using a specific compositing strategy.
-# Arguments: name, number of processes, image size, strategy, layers, layer ranks
+# Arguments: name, number of processes, strategy, image size, layers, layer ranks
 define test_blend_strategy
 $(eval
 # Local variables.
-img/blend/$1: IN_FILES := $(5:%=$(RES)/img/%.png)
-img/blend/$1: REF_FILE := $(OUT)/img/blend/$1.ref
-img/blend/$1: OUT_FILE := $(OUT)/img/blend/$1.$4.out
-)
+img/blend/$3/$1: REF_FILE := $(OUT)/res/img/$1.blend
+img/blend/$3/$1: OUT_FILE := $(OUT)/img/blend/$3/$1.out
 
-$(call test_case,img/blend/$1, \
+$(call test_case,img/blend/$3/$1, \
 	$(BUILD)/bin/icet-blend \
 		$(BUILD)/bin/blend \
 		$(ICET_COMMON) \
-		$$(IN_FILES), \
-	mpirun -n $2 --oversubscribe $$< $3 $4 $$(join $(6:%=%:),$$(IN_FILES)) > $$(OUT_FILE) \
-		&& { $(BUILD)/bin/layer $3 $$(IN_FILES) | $(BUILD)/bin/blend > $$(REF_FILE); } \
+		$(5:%=$(RES)/img/%.png) \
+		$(OUT)/res/img/$1.blend, \
+	mpirun -n $2 --oversubscribe $$< $3 $4 $$(join $(6:%=%:),$(5:%=$(RES)/img/%.png)) > $$(OUT_FILE) \
 		&& cmp $$(OUT_FILE) $$(REF_FILE) \
-		&& rm $$(OUT_File) $$(REF_FILE) \
+		&& rm $$(OUT_FILE) \
 	)
+)
 endef
 
 # The names of IceT's single image compositing strategies as expected by `icet-blend`.
@@ -196,14 +195,23 @@ SINGLE_IMAGE_STRATEGIES := bswap tree radixk radixkr bswap-folding
 # Add a test case for image blending with IceT using all compositing strategies.
 # Arguments: name, number of processes, image size, layers, layer ranks
 define test_blend
+$(eval
+# Generate the expected output.
+$(OUT)/res/img/$1.blend: IN_FILES := $(4:%=$(RES)/img/%.png)
+$(OUT)/res/img/$1.blend: $(BUILD)/bin/layer $(BUILD)/bin/blend $$(IN_FILES) \
+		| $(dir $(OUT)/res/img/$1)
+	@$$< $3 $$(IN_FILES) | $(BUILD)/bin/blend > $$@ 2> $$@.err && rm $$@.err || rm $$@
+
+# Create a target for each strategy.
 $(foreach strategy,\
 	direct \
-		$(SINGLE_IMAGE_STRATEGIES:%=sequential.%)\
+		$(SINGLE_IMAGE_STRATEGIES:%=sequential/%)\
 		split \
-		$(SINGLE_IMAGE_STRATEGIES:%=reduce.%)\
+		$(SINGLE_IMAGE_STRATEGIES:%=reduce/%)\
 		vtree,\
-	$(call test_blend_strategy,$1.$(strategy),$2,$3,$(strategy),$4,$5)\
+	$(call test_blend_strategy,$1,$2,$(strategy),$3,$4,$5)\
 	)
+)
 endef
 
 $(call test_blend,diag/rgb,1,5 5,diag/red diag/green diag/blue,0 0 0)

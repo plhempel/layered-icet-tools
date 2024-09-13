@@ -5,7 +5,7 @@
 
 
 /// Use IceT to blend PNG images front to back.
-/// Expected arguments: <width> <height> <strategy>[.<single-image-strategy>] [<rank>:<image>]...
+/// Expected arguments: <strategy>[/<single-image-strategy>] <width> <height> [<rank>:<image>]...
 auto main(int argc, char* argv[]) -> int {
 	using namespace deep_icet;
 	return try_main([&]() {
@@ -14,17 +14,17 @@ auto main(int argc, char* argv[]) -> int {
 	IceTSizeType width, height;
 
 	if (argc < 4
-			or (width  = atoi(argv[1])) == 0
-			or (height = atoi(argv[2])) == 0
+			or (width  = atoi(argv[2])) == 0
+			or (height = atoi(argv[3])) == 0
 			) {
 		std::cerr << log_sev_fatal << "Invalid or missing arguments.\n"
-		             "Usage: " << argv[0] << " <width> <height> "
-		             "<strategy>[.<single-image-strategy>] [<rank>:<image>]...\n";
+		             "Usage: " << argv[0] << " <strategy>[/<single-image-strategy>] <width> "
+		                                     "<height> [<rank>:<image>]...\n";
 		return EXIT_FAILURE;
 		}
 
 	// Parse strategy.
-	std::string_view const strategy_name {argv[3], std::strchr(argv[3], '.')};
+	std::string_view const strategy_name {argv[1], std::strchr(argv[1], '/')};
 	auto const             strategy      {
 			StrategyTable::find(strategy_name.data(), strategy_name.size())};
 
@@ -37,7 +37,7 @@ auto main(int argc, char* argv[]) -> int {
 	auto single_image_strategy {ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC};
 
 	if (strategy->uses_single_image_strategy) {
-		if (*strategy_name.end() != '.') {
+		if (*strategy_name.end() != '/') {
 			std::cerr << "The selected compositing strategy requires a single image compositing "
 			             "strategy to be specified.\n";
 			return EXIT_FAILURE;
