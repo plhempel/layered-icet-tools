@@ -24,7 +24,7 @@ auto main(int argc, char* argv[]) -> int {
 		}
 
 	// Parse strategy.
-	std::string_view const strategy_name {argv[1], std::strchr(argv[1], '/')};
+	std::string_view const strategy_name {argv[1], std::strcspn(argv[1], "/")};
 	auto const             strategy      {
 			StrategyTable::find(strategy_name.data(), strategy_name.size())};
 
