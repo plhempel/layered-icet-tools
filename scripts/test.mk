@@ -64,7 +64,7 @@ ICET_GL3    := $(ICET_GL)
 # Arguments: exe suffix (after `icetTests_`), library names, name, number of processes
 test_icet = $(call test_case,icet/$1/$3,\
 	$(BUILD)/bin/icetTests_$1 $2,\
-	mpirun -n $4 --oversubscribe $$< $3\
+	mpirun -n $4 --oversubscribe $$< -logdebug $3\
 	)
 
 
@@ -75,7 +75,7 @@ $(call test_icet_mpi,CompressionSize,2)
 $(call test_icet_mpi,FloatingViewport,2)
 $(call test_icet_mpi,ImageConvert,2)
 $(call test_icet_mpi,Interlace,2)
-$(call test_icet_mpi,MaxImageSplit,2)
+$(call test_icet_mpi,MaxImageSplit,8)
 $(call test_icet_mpi,OddImageSizes,1)
 $(call test_icet_mpi,OddProcessCounts,8)
 $(call test_icet_mpi,PreRender,1)

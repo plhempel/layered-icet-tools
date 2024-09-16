@@ -32,7 +32,7 @@ Context::Context(int* argc, char*** argv)
 	stdout_to_stderr();
 
 	// Basic IceT configuration.
-	icetDiagnostics(ICET_DIAG_DEBUG);
+	icetDiagnostics(ICET_DIAG_FULL);
 
 	icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
 
