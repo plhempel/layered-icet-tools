@@ -216,6 +216,9 @@ endef
 
 $(call test_blend,diag/rgb,1,5 5,diag/red diag/green diag/blue,0 0 0)
 $(call test_blend,diag/r0g1b0,2,5 5,diag/red diag/green diag/blue,0 1 0)
+$(call test_blend,diag/r0g1b2,3,5 5,diag/red diag/green diag/blue,0 1 2)
+$(call test_blend,diag/r0g1b2r3,4,5 5,diag/red diag/green diag/blue diag/red,0 1 2 3)
+$(call test_blend,diag/r0g1b0r1,2,5 5,diag/red diag/green diag/blue diag/red,0 1 0 1)
 
 
 # If no target is selected, run all tests.
