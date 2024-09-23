@@ -66,7 +66,7 @@ auto main(int argc, char* argv[]) -> int {
 	icetAddTile(0, 0, width, height, 0);
 
 	// Parse layers.
-	UniqueSpan<InputLayer> const in_layers  {int_cast<std::size_t>(argc - 3)};
+	UniqueSpan<InputLayer> const in_layers  {int_cast<std::size_t>(argc - 4)};
 	std::size_t                  num_layers {0};
 
 	for (auto argi {4}; argi < argc; ++argi) {

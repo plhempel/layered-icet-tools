@@ -70,16 +70,17 @@ auto read_binary(FILE* in, std::span<T> buffer) -> void {
 	std::size_t            size   {0};
 
 	while (not feof(in)) {
+		if (size == buffer.size()) {
+			buffer.resize(size * 2);
+			}
+
 		size += fread(&buffer[size], sizeof(std::byte), buffer.size() - size, in);
 
 		if (ferror(in)) {
 			throw std::runtime_error("Error reading file");
-			}
-
-		if (size == buffer.size()) {
-			buffer.resize(size * 2);
 			}}
 
+	buffer.resize(size);
 	return buffer;
 	}
 
