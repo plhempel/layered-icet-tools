@@ -1,5 +1,8 @@
 #include "common.hpp"
 
+#include <algorithm>
+#include <numeric>
+
 
 namespace deep_icet {
 
@@ -116,8 +119,8 @@ RawImage::RawImage(
 		: _width        {width}
 		, _height       {height}
 		, _num_layers   {int_cast<IceTSizeType>(layers.size())}
-		, _color_buffer {std::make_unique<Color[]>(num_fragments())}
-		, _depth_buffer {std::make_unique<Depth[]>(num_fragments())}
+		, _buffer       {num_fragments() * (sizeof(Color) + sizeof(Depth))}
+		, _depth_buffer {reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color))}
 		{
 	// For each layer:
 	for (std::size_t layer_idx {0}; layer_idx < layers.size(); ++layer_idx) {
@@ -125,39 +128,144 @@ RawImage::RawImage(
 		auto const png_width  {int_cast<IceTSizeType>(png.get_width())};
 		auto const png_height {int_cast<IceTSizeType>(png.get_height())};
 
-		// For each pixel:
+		// For each row of the input image:
 		for (IceTSizeType y {0}; y < std::min(height, png_height); ++y) {
-			for (IceTSizeType x {0}; x < std::min(width, png_width); ++x) {
+			IceTSizeType x {0};
+
+			// Copy pixels from the input image.
+			for (; x < std::min(width, png_width); ++x) {
 				// Copy color, scaled by alpha,
 				auto const& color   {reinterpret_cast<Color const&>(png[y][x])};
 				auto const  alpha   {color[color::alpha_channel]};
 				auto const  out_idx {(y * width + x) * _num_layers + layer_idx};
 
 				for (std::size_t i {0}; i < color.size(); ++i) {
-					_color_buffer[out_idx][i] = color[i] * alpha / color::channel_max;
+					color_buffer(out_idx)[i] = color[i] * alpha / color::channel_max;
 					}
 
-				_color_buffer[out_idx][color::alpha_channel] = alpha;
+				color_buffer(out_idx)[color::alpha_channel] = alpha;
 
 				// Set depth, with empty fragments marked as background.
-				_depth_buffer[out_idx] = alpha == 0 ? 1 : layers[layer_idx].depth;
+				_depth_buffer[out_idx] = layers[layer_idx].depth;
+				}
+
+			// Clear the area outside the input image.
+			for (; x < width; ++x) {
+				auto const idx {(y * width + x) * _num_layers + layer_idx};
+
+				color_buffer(idx)  = {0, 0, 0, 0};
+				_depth_buffer[idx] = layers[layer_idx].depth;
+				}}
+
+		// Clear the area below the input image.
+		for (auto idx {png_height * width}; idx < height * width; ++idx) {
+			color_buffer(idx)  = Fragment{}.color;
+			_depth_buffer[idx] = layers[layer_idx].depth;
+			}}}
+
+RawImage::RawImage(
+		IceTSizeType const        width,
+		IceTSizeType const        height,
+		std::span<RawImage const> sources
+		)
+		: _width        {width}
+		, _height       {height}
+		, _num_layers   {std::accumulate(
+			sources.begin(),
+			sources.end(),
+			0,
+			[](auto const accum, RawImage const& img) {
+				return accum + img.num_layers();
+				}
+			)}
+		, _buffer       {num_fragments() * (sizeof(Color) + sizeof(Depth))}
+		, _depth_buffer {reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color))}
+		{
+	// Store all fragments at the current pixel.
+	std::vector<Fragment> frags;
+	frags.reserve(_num_layers);
+
+	// For each pixel:
+	for (IceTSizeType y {0}; y < height; ++y) {
+		for (IceTSizeType x {0}; x < width; ++x) {
+			frags.clear();
+
+			// Gather the fragments from all input images.
+			for (auto const& img : sources) {
+				if (x < img.width() and y < img.height()) {
+					for (auto layer {0}; layer < img.num_layers(); ++layer) {
+						auto const idx {(y * img.width() + x) * img.num_layers() + layer};
+						frags.push_back({img.color()[idx], img.depth()[idx]});
+						}}
+				else {
+					// Pixels outside a given image are filled with background.
+					for (auto layer {0}; layer < img.num_layers(); ++layer) {
+						frags.emplace_back();
+						}}}
+
+			// Sort fragments by depth.
+			std::sort(frags.begin(), frags.end(), [](Fragment const& lhs, Fragment const& rhs) {
+					return std::less{}(lhs.depth , rhs.depth);
+					});
+
+			// Copy fragments to the image buffer in order.
+			for (auto layer {0}; layer < _num_layers; ++layer) {
+				auto const pixel {(y * _width + x) * _num_layers};
+				color_buffer(pixel + layer)  = frags[layer].color;
+				_depth_buffer[pixel + layer] = frags[layer].depth;
 				}}}}
 
-RawImage::RawImage(FILE* const in) {
-	// Read size.
-	read_binary(in, std::span{&_width, 3});
+RawImage::RawImage(IceTSizeType width, IceTSizeType height, FILE* const in)
+	: _width  {width}
+	, _height {height}
+	{
+	auto const layer_size {width * height * (sizeof(Color) + sizeof(Depth))};
 
-	// Allocate buffers.
-	_color_buffer = std::make_unique<Color[]>(num_fragments());
-	_depth_buffer = std::make_unique<Depth[]>(num_fragments());
+	// Read data.
+	_buffer = read_all(in, layer_size);
 
-	// Read fragment data.
-	read_binary(in, std::span{_color_buffer.get(), static_cast<std::size_t>(num_fragments())});
-	read_binary(in, std::span{_depth_buffer.get(), static_cast<std::size_t>(num_fragments())});
+	// Calculate number of layers and verify size.
+	_num_layers = _buffer.size() / layer_size;
+
+	if (_buffer.size() % layer_size != 0) {
+		throw std::runtime_error{"Buffer size does not match the expected number of pixels"};
+		}
+
+	// Calculate depth buffer offset.
+	_depth_buffer = reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color));
+	}
+
+RawImage::RawImage(
+		IceTSizeType width,
+		IceTSizeType height,
+		FILE* const  color_file,
+		FILE* const  depth_file
+		)
+	: _width  {width}
+	, _height {height}
+	{
+	auto const layer_size {width * height * sizeof(Color)};
+
+	// Read color data.
+	_buffer = read_all(color_file, layer_size);
+
+	// Calculate number of layers and verify size.
+	_num_layers = _buffer.size() / layer_size;
+
+	if (_buffer.size() % layer_size != 0) {
+		throw std::runtime_error{"Buffer size does not match the expected number of pixels"};
+		}
+
+	// Read depth data.
+	_buffer.resize(_buffer.size() + num_pixels() * sizeof(Depth));
+	_depth_buffer = reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color));
+	read_binary(
+			depth_file,
+			std::span<Depth>{_depth_buffer, static_cast<std::size_t>(num_fragments())}
+			);
 	}
 
 auto RawImage::write(FILE* out) const -> void {
-	write_binary(std::span{&_width, 3}, out);
 	write_binary(color(), out);
 	write_binary(depth(), out);
 	}

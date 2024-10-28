@@ -2,7 +2,7 @@
 
 
 /// Assemble PNG files into a single layered fragment buffer.
-/// Expected arguments: <width> <height> [<image>]...
+/// Arguments: <width> <height> [<image>]...
 auto main(int argc, char* argv[]) -> int {
 	using namespace deep_icet;
 	return try_main([&]() {

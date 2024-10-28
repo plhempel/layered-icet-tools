@@ -99,126 +99,130 @@ test_icet_mpi_opengl3 = $(call test_icet,mpi_opengl3,$(ICET_GL3),$1,$2)
 $(call test_icet_mpi_opengl3,SimpleExampleOGL3,2)
 
 
-# Define a layered test image.
-# Arguments: name, size, layers
-define layer
+# Generate a reference solution to compare IceT's output against.
+# Arguments: name, reference implementation, input assembler, input size, input files
+define reference_solution
 $(eval
-# Local variables.
-$(OUT)/res/img/$1.raw: IN_FILES := $(3:%=$(RES)/img/%.png)
-
-# Generate the fragment buffer.
-$(OUT)/res/img/$1.raw: $(BUILD)/bin/layer $$(IN_FILES) | $(dir $(OUT)/res/img/$1)
-	@$$< $2 $$(IN_FILES) > $$@ 2> $$@.err && rm $$@.err || rm $$@
+# Assemble input images into a single file, then generate the reference solution from that file.
+$(OUT)/res/img/$1: $2 $3 $(ICET_COMMON) $5 \
+		| $(dir $(OUT)/res/img/$1)
+	@$3 $4 $5 | $2 $4 > $$@ 2> $$@.err \
+	&& rm $$@.err \
+	|| rm $$@
 )
 endef
 
-# Reference solution for image compression.
-$(OUT)/res/img/%.sparse: $(BUILD)/bin/compress $(ICET_COMMON) $(OUT)/res/img/%.raw
-	@$< < $(OUT)/res/img/$*.raw > $@ 2> $@.err && rm $@.err || rm $@
+# Track test image names, so they are only defined once.
+TEST_IMAGES :=
 
-# Reference solution for image blending.
-$(OUT)/res/img/%.blend: $(BUILD)/bin/blend $(ICET_COMMON) $(OUT)/res/img/%.raw
-	@$< < $(OUT)/res/img/$*.raw > $@ 2> $@.err && rm $@.err || rm $@
-
-
-# Add a test case for image compression.
-# Arguments: name
-define test_compress
+# For a test image generate reference solutions, test compression and decompression.
+# Arguments: name, input assembler, input size, input files
+define test_image
+# Ignore repeated definitions.
+$(if $(findstring $1,$(TEST_IMAGES)),,$\
 $(eval
-# Local variables.
+# Register image.
+TEST_IMAGES += $1
+
+# Compress with IceT, then check against reference solution.
 img/compress/$1: OUT_FILE := $(OUT)/img/compress/$1.out
-
-# Compress with IceT, then check against referene solution.
-$(call test_case,img/compress/$1, \
-	$(BUILD)/bin/icet-compress $(ICET_COMMON) $(OUT)/res/img/$1.sparse, \
-	$$< < $(OUT)/res/img/$1.raw > $$(OUT_FILE) \
+$(call test_case,img/compress/$1,$\
+	$(BUILD)/bin/icet-compress $2 $4 $(OUT)/res/img/$1.sparse,$\
+	$2 $3 $4 | $$< $3 > $$(OUT_FILE) \
 		&& cmp $$(OUT_FILE) $(OUT)/res/img/$1.sparse \
-		&& rm $$(OUT_FILE) \
+		&& rm $$(OUT_FILE)$\
 	)
-)
-endef
-
-# Add a test case for image decompression.
-# Arguments: name
-define test_decompress
-$(eval
-# Local variables.
-img/decompress/$1: OUT_FILE := $(OUT)/img/decompress/$1.out
+# Generate reference solution.
+$(call reference_solution,$1.sparse,$(BUILD)/bin/compress,$2,$3,$4)
 
 # Decompress with IceT, then check against reference solution.
-$(call test_case,img/decompress/$1, \
-	$(BUILD)/bin/icet-decompress $(ICET_COMMON) $(OUT)/res/img/$1.sparse $(OUT)/res/img/$1.blend, \
+img/decompress/$1: OUT_FILE := $(OUT)/img/decompress/$1.out
+$(call test_case,img/decompress/$1,$\
+	$(BUILD)/bin/icet-decompress $(ICET_COMMON) $(OUT)/res/img/$1.sparse $(OUT)/res/img/$1.blend,$\
 	$$< < $(OUT)/res/img/$1.sparse > $$(OUT_FILE) \
 		&& cmp $$(OUT_FILE) $(OUT)/res/img/$1.blend \
-		&& rm $$(OUT_FILE) \
+		&& rm $$(OUT_FILE)$\
 	)
+# Generate reference solution.
+$(call reference_solution,$1.blend,$(BUILD)/bin/blend,$2,$3,$4)
+)
 )
 endef
 
-# Add test cases for compressing and decompressing an image.
-# Arguments: name, size, layers
-define test_image
-$(call layer,$1,$2,$3)
-$(call test_compress,$1)
-$(call test_decompress,$1)
-endef
-
-$(call test_image,diag/r,5 5,diag/red)
-$(call test_image,diag/rg,5 5,diag/red diag/green)
-$(call test_image,diag/rgb,5 5,diag/red diag/green diag/blue)
-
-
-# Add a test case for image blending with IceT using a specific compositing strategy.
-# Arguments: name, number of processes, strategy, image size, layers, layer ranks
-define test_blend_strategy
-$(eval
-# Local variables.
-img/blend/$3/$1: REF_FILE := $(OUT)/res/img/$1.blend
-img/blend/$3/$1: OUT_FILE := $(OUT)/img/blend/$3/$1.out
-
-$(call test_case,img/blend/$3/$1, \
-	$(BUILD)/bin/icet-blend \
-		$(BUILD)/bin/blend \
-		$(ICET_COMMON) \
-		$(5:%=$(RES)/img/%.png) \
-		$(OUT)/res/img/$1.blend, \
-	mpirun -n $2 --oversubscribe $$< $3 $4 $$(join $(6:%=%:),$(5:%=$(RES)/img/%.png)) > $$(OUT_FILE) \
-		&& cmp $$(OUT_FILE) $$(REF_FILE) \
-		&& rm $$(OUT_FILE) \
-	)
-)
-endef
 
 # The names of IceT's single image compositing strategies as expected by `icet-blend`.
 SINGLE_IMAGE_STRATEGIES := bswap tree radixk radixkr bswap-folding
 
-# Add a test case for image blending with IceT using all compositing strategies.
-# Arguments: name, number of processes, image size, layers, layer ranks
+# Helper function to join a list of words into a single string with no spaces, see
+# https://www.gnu.org/software/make/manual/make.html#Syntax-of-Functions.
+# Arguments: words, separator
+NIL :=
+.   := $(NIL) $(NIL)
+glue = $(subst $.,$2,$1)
+
+# Add a test case for image blending with IceT using all strategies.
+# Test cases for compression and decompression are created as well.
+# Arguments: image name, input assembler, distribution name, program, number of processes,
+#            image size, images [, image ranks]
 define test_blend
 $(eval
-# Generate the expected output.
-$(OUT)/res/img/$1.blend: IN_FILES := $(4:%=$(RES)/img/%.png)
-$(OUT)/res/img/$1.blend: $(BUILD)/bin/layer $(BUILD)/bin/blend $$(IN_FILES) \
-		| $(dir $(OUT)/res/img/$1)
-	@$$< $3 $$(IN_FILES) | $(BUILD)/bin/blend > $$@ 2> $$@.err && rm $$@.err || rm $$@
+# Generate reference solutions, test compression and decompression.
+$(call test_image,$1,$2,$6,$7)
 
 # Create a target for each strategy.
-$(foreach strategy,\
+$(foreach strategy,$\
 	direct \
-		$(SINGLE_IMAGE_STRATEGIES:%=sequential/%)\
+		$(SINGLE_IMAGE_STRATEGIES:%=sequential/%) \
 		split \
-		$(SINGLE_IMAGE_STRATEGIES:%=reduce/%)\
-		vtree,\
-	$(call test_blend_strategy,$1,$2,$(strategy),$3,$4,$5)\
+		$(SINGLE_IMAGE_STRATEGIES:%=reduce/%) \
+		vtree,$\
+# Local variables.
+img/blend/$(strategy)/$1/$3: OUT_FILE := $(OUT)/img/blend/$(strategy)/$1/$3.out
+
+# Blend the images, compare the output to the reference solution.
+$(call test_case,img/blend/$(strategy)/$1/$3,$\
+	$4 $(ICET_COMMON) $7 $(OUT)/res/img/$1.blend,$\
+	mpirun --oversubscribe -n $5 $4 $(strategy) $6 $$(join $(8:%=%:),$7) > $$(OUT_FILE) \
+		&& cmp $$(OUT_FILE) $(OUT)/res/img/$1.blend \
+		&& rm $$(OUT_FILE)$\
 	)
+)
 )
 endef
 
-$(call test_blend,diag/rgb,1,5 5,diag/red diag/green diag/blue,0 0 0)
-$(call test_blend,diag/r0g1b0,2,5 5,diag/red diag/green diag/blue,0 1 0)
-$(call test_blend,diag/r0g1b2,3,5 5,diag/red diag/green diag/blue,0 1 2)
-$(call test_blend,diag/r0g1b2r3,4,5 5,diag/red diag/green diag/blue diag/red,0 1 2 3)
-$(call test_blend,diag/r0g1b0r1,2,5 5,diag/red diag/green diag/blue diag/red,0 1 0 1)
+# Test blending with PNG layers as input.
+# Arguments: image name, number of processes, image size, images, image ranks
+test_blend_png =$(call test_blend,$\
+	$1,$\
+	$(BUILD)/bin/layer,$\
+	$(call glue,$5),$\
+	$(BUILD)/bin/icet-blend-png,$\
+	$2,$\
+	$3,$\
+	$(4:%=$(RES)/img/%.png),$\
+	$5$\
+	)
+
+$(call test_blend_png,diag/rgb,1,5 5,diag/red diag/green diag/blue,0 0 0)
+$(call test_blend_png,diag/rgb,2,5 5,diag/red diag/green diag/blue,0 1 0)
+$(call test_blend_png,diag/rgb,3,5 5,diag/red diag/green diag/blue,0 1 2)
+$(call test_blend_png,diag/rgbr,4,5 5,diag/red diag/green diag/blue diag/red,0 1 2 3)
+$(call test_blend_png,diag/rgbr,2,5 5,diag/red diag/green diag/blue diag/red,0 1 0 1)
+
+# Test blending with raw fragment buffers as input.
+# Arguments: image name, distribution name, image size, images
+test_blend_raw =$(call test_blend,$\
+	$1,$\
+	$(BUILD)/bin/merge,$\
+	$2,$\
+	$(BUILD)/bin/icet-blend-raw,$\
+	$(words $4),$\
+	$3,$\
+	$(foreach p,$4,$(RES)/img/$p.color $(RES)/img/$p.depth)$\
+	)
+
+$(call test_blend_raw,rt/4,0123,1280 720,rt/4/0 rt/4/1 rt/4/2 rt/4/3)
+$(call test_blend_raw,rt/8,01234567,1280 720,rt/8/0 rt/8/1 rt/8/2 rt/8/3 rt/8/4 rt/8/5 rt/8/6 rt/8/7)
 
 
 # If no target is selected, run all tests.

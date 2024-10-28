@@ -2,6 +2,7 @@
 
 
 /// Use IceT to compress a layered fragment buffer into a layered `IceTSparseImage`.
+/// Arguments: <width> <height>
 auto main(int argc, char* argv[]) -> int {
 	using namespace deep_icet;
 	return try_main([&]() {
@@ -14,8 +15,20 @@ auto main(int argc, char* argv[]) -> int {
 		return EXIT_SUCCESS;
 		}
 
+	// Parse output size.
+	IceTSizeType width, height;
+
+	if (argc < 3
+			or (width  = atoi(argv[1])) == 0
+			or (height = atoi(argv[2])) == 0
+			) {
+		std::cerr << log_sev_fatal << "Invalid or missing arguments.\n"
+		             "Usage: " << argv[0] << " <width> <height>\n";
+		return EXIT_FAILURE;
+		}
+
 	// Read input.
-	RawImage const in_buffer {freopen(nullptr, "rb", stdin)};
+	RawImage const in_buffer {width, height, freopen(nullptr, "rb", stdin)};
 
 	auto const in_image {icetGetStatePointerLayeredImage(
 			ICET_RENDER_BUFFER,

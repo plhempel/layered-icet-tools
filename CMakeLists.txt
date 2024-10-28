@@ -33,18 +33,19 @@ function (strategy_lookup FILE CLASS)
 		              -S 1 -tlcCEID > "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp"
 		DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/res/${FILE}.gperf"
 		)
-	target_sources (icet-blend PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp")
+	target_sources (icet-blend-png PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp")
 	endfunction ()
 
 # Project executables.
 deep_icet_exe (blend)
 deep_icet_exe (compress)
-deep_icet_exe (icet-blend)
+deep_icet_exe (icet-blend-png)
 deep_icet_exe (icet-blend-raw)
 deep_icet_exe (icet-compress)
 deep_icet_exe (icet-decompress)
 deep_icet_exe (icet-to-png)
 deep_icet_exe (layer)
+deep_icet_exe (merge)
 
 strategy_lookup (strategy-hash              StrategyTable)
 strategy_lookup (single-image-strategy-hash SingleImageStrategyTable)
