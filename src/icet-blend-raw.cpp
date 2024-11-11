@@ -62,8 +62,6 @@ auto main(int argc, char* argv[]) -> int {
 	icetStrategy(strategy->key);
 	icetSingleImageStrategy(single_image_strategy);
 
-	icetDisable(ICET_INTERLACE_IMAGES);
-
 	icetResetTiles();
 	icetAddTile(0, 0, width, height, 0);
 
