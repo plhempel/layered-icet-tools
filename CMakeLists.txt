@@ -29,11 +29,13 @@ function (deep_icet_exe NAME)
 function (strategy_lookup FILE CLASS)
 	add_custom_command(
 		OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp"
+		COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/src"
 		COMMAND gperf "${CMAKE_CURRENT_SOURCE_DIR}/res/${FILE}.gperf" -L C++ -N find -Z ${CLASS}
-		              -S 1 -tlcCEID > "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp"
+			          -S 1 -tlcCEID > "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp"
 		DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/res/${FILE}.gperf"
 		)
 	target_sources (icet-blend-png PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp")
+	target_sources (icet-blend-raw PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp")
 	endfunction ()
 
 # Project executables.
