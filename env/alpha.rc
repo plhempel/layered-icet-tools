@@ -1,6 +1,7 @@
 module load \
 	development/24.04 \
 	GCC/13.2.0 \
-	OpenMPI/4.1.6 \
+	gperf/3.1 \
 	libpng/1.6.40 \
+	OpenMPI/4.1.6 \
 	;
