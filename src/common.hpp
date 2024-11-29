@@ -23,6 +23,11 @@
 #include <png.hpp>
 
 
+#if defined(__GNUC__) and __GNUC__ < 14
+	#pragma GCC diagnostic ignored "-Wsubobject-linkage"
+	#endif
+
+
 /// Functionality used by multiple deep-icet executables.
 namespace deep_icet {
 
