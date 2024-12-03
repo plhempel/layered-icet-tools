@@ -85,6 +85,8 @@ $(call test_icet_mpi,SimpleTiming,2)
 $(call test_icet_mpi,SparseImageCopy,2)
 
 
+$(shell test -f $(BUILD)/bin/icetTests_mpi_opengl)
+ifeq ($(.SHELLSTATUS),0)
 test_icet_mpi_opengl = $(call test_icet,mpi_opengl,$(ICET_GL),$1,$2)
 
 $(call test_icet_mpi_opengl,BlankTiles,2)
@@ -92,11 +94,15 @@ $(call test_icet_mpi_opengl,BoundsBehindViewer,2)
 $(call test_icet_mpi_opengl,DisplayNoDraw,2)
 $(call test_icet_mpi_opengl,RandomTransform,2)
 $(call test_icet_mpi_opengl,SimpleExample,2)
+endif
 
 
+$(shell test -f $(BUILD)/bin/icetTests_mpi_opengl3)
+ifeq ($(.SHELLSTATUS),0)
 test_icet_mpi_opengl3 = $(call test_icet,mpi_opengl3,$(ICET_GL3),$1,$2)
 
 $(call test_icet_mpi_opengl3,SimpleExampleOGL3,2)
+endif
 
 
 # Generate a reference solution to compare IceT's output against.
