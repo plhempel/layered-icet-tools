@@ -170,12 +170,7 @@ $(eval
 $(call test_image,$1,$2,$6,$7)
 
 # Create a target for each strategy.
-$(foreach strategy,$\
-	direct \
-		$(SINGLE_IMAGE_STRATEGIES:%=sequential/%) \
-		split \
-		$(SINGLE_IMAGE_STRATEGIES:%=reduce/%) \
-		vtree,$\
+$(foreach strategy,$(SINGLE_IMAGE_STRATEGIES:%=sequential/%),$\
 # Local variables.
 img/blend/$(strategy)/$1/$3: OUT_FILE := $(OUT)/img/blend/$(strategy)/$1/$3.out
 
