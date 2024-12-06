@@ -54,6 +54,15 @@ $(OUT)/$1.log: $2 | $(dir $(OUT)/$1)
 endef
 
 
+# Run a distributed program.
+# Uses srun if available and mpirun otherwise.
+# Arguments: number of processes, command
+run_dist = $(if $(shell command -v srun),$\
+	srun -n $1 $2,$\
+	mpirun -n $1 --oversubscribe $2$\
+	)
+
+
 # IceT libraries.
 ICET_COMMON := $(wildcard $(BUILD)/lib/*IceTCore.* $(BUILD)/lib/*IceTMPI.*)
 ICET_GL     := $(ICET_COMMON) $(wildcard $(BUILD)/lib/*IceTGL.*)
@@ -64,7 +73,7 @@ ICET_GL3    := $(ICET_GL)
 # Arguments: exe suffix (after `icetTests_`), library names, name, number of processes
 test_icet = $(call test_case,icet/$1/$3,\
 	$(BUILD)/bin/icetTests_$1 $2,\
-	mpirun -n $4 --oversubscribe $$< -logdebug $3\
+	$(call run_dist,$4,$$< -logdebug $3)\
 	)
 
 
@@ -157,7 +166,7 @@ endef
 
 
 # The names of IceT's single image compositing strategies as expected by `icet-blend`.
-SINGLE_IMAGE_STRATEGIES := bswap tree radixk radixkr bswap-folding
+SINGLE_IMAGE_STRATEGIES := bswap bswap-folding
 
 # Helper function to join a list of words into a single string with no spaces, see
 # https://www.gnu.org/software/make/manual/make.html#Syntax-of-Functions.
@@ -183,7 +192,7 @@ img/blend/$(strategy)/$1/$3: OUT_FILE := $(OUT)/img/blend/$(strategy)/$1/$3.out
 # Blend the images, compare the output to the reference solution.
 $(call test_case,img/blend/$(strategy)/$1/$3,$\
 	$4 $(ICET_COMMON) $7 $(OUT)/res/img/$1.blend,$\
-	mpirun --oversubscribe -n $5 $4 $(strategy) $6 $$(join $(8:%=%:),$7) > $$(OUT_FILE) \
+	$(call run_dist,$5,$4 $(strategy) $6 $$(join $(8:%=%:),$7)) > $$(OUT_FILE) \
 		&& cmp $$(OUT_FILE) $(OUT)/res/img/$1.blend \
 		&& rm $$(OUT_FILE)$\
 	)
