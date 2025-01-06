@@ -62,7 +62,7 @@ struct Fragment {
 /// Cast between integer types, asserting that the given value can be represented in both.
 template<std::integral TTo, std::integral TFrom>
 constexpr auto int_cast(TFrom const& value) -> TTo {
-	using BitUnion = std::make_unsigned_t<std::common_type_t<TTo, TFrom>>;
+	using BitUnion [[maybe_unused]] = std::make_unsigned_t<std::common_type_t<TTo, TFrom>>;
 
 	// Assert that only bits shared between both types are set.
 	assert(static_cast<BitUnion>(value) < BitUnion{1} << std::min(
