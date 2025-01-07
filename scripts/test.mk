@@ -47,9 +47,9 @@ $1: ERR := $(OUT)/$1.err
 # Run the test.
 $(OUT)/$1.log: $2 | $(dir $(OUT)/$1)
 	@printf '\e[1mRun\e[m $1\n'
-	{ $3; } >$$@ 2>&1 \
-	&& { rm -f $$(ERR);  printf '\e[1;32mOk\e[m  $$@\n'; } \
-	|| { mv $$@ $$(ERR); printf '\e[1;31mErr\e[m $$(ERR)\n'; }
+	{ $3; } >$$(ERR) 2>&1 \
+	&& { mv $$(ERR) $$@; printf '\e[1;32mOk\e[m  $$@\n'; } \
+	|| { printf '\e[1;31mErr\e[m $$(ERR)\n'; }
 )
 endef
 
@@ -166,7 +166,7 @@ endef
 
 
 # The names of IceT's single image compositing strategies as expected by `icet-blend`.
-SINGLE_IMAGE_STRATEGIES := bswap bswap-folding
+SINGLE_IMAGE_STRATEGIES := bswap bswap-folding radixk
 
 # Helper function to join a list of words into a single string with no spaces, see
 # https://www.gnu.org/software/make/manual/make.html#Syntax-of-Functions.
