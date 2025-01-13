@@ -1,3 +1,6 @@
+# Name identifying the environment.
+export CONFIG=barnard
+
 # Required software.
 module load \
 	development/24.04 \
