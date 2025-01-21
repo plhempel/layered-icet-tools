@@ -166,15 +166,18 @@ $(call reference_solution,$1.blend,$(BUILD)/bin/blend,$2,$3,$4)
 endef
 
 
+# Values to test for the ICET_MAGIC_K environment variable.
+RADIXK_MAGIC_K := 2 4 5 6 7 8
+
 # The names of IceT's single image compositing strategies as expected by `icet-blend`.
-SINGLE_IMAGE_STRATEGIES := bswap bswap-folding radixk
+SINGLE_IMAGE_STRATEGIES := bswap bswap-folding $(RADIXK_MAGIC_K:%=radixk/%)
 
 # Helper function to join a list of words into a single string with no spaces, see
 # https://www.gnu.org/software/make/manual/make.html#Syntax-of-Functions.
 # Arguments: words, separator
-NIL :=
-.   := $(NIL) $(NIL)
-glue = $(subst $.,$2,$1)
+NIL   :=
+SPACE := $(NIL) $(NIL)
+concat = $(subst $(SPACE),$2,$1)
 
 # Add a test case for image blending with IceT using all strategies.
 # Test cases for compression and decompression are created as well.
@@ -193,20 +196,32 @@ img/blend/$(strategy)/$1/$3: OUT_FILE := $(OUT)/img/blend/$(strategy)/$1/$3.out
 # Blend the images, compare the output to the reference solution.
 $(call test_case,img/blend/$(strategy)/$1/$3,$\
 	$4 $(ICET_COMMON) $7 $(OUT)/res/img/$1.blend,$\
-	$(call run_dist,$5,$4 $(strategy) $6 $$(join $(8:%=%:),$7)) > $$(OUT_FILE) \
-		&& cmp $$(OUT_FILE) $(OUT)/res/img/$1.blend \
-		&& rm $$(OUT_FILE)$\
+	$(call run_dist,$5,$4 \
+		$(call concat,$(wordlist 1,2,$(subst /, ,$(strategy))),/) \
+		$6 \
+		$$(join $(8:%=%:),$7)\
+		) \
+	> $$(OUT_FILE) \
+	&& cmp $$(OUT_FILE) $(OUT)/res/img/$1.blend \
+	&& rm $$(OUT_FILE)$\
 	)
 )
 )
 endef
+
+# Define the k value for each radix-k test.
+$(foreach k,$(RADIXK_MAGIC_K),$\
+$(eval $\
+img/blend/sequential/radixk/$k/%: export ICET_MAGIC_K := $k$\
+)$\
+)
 
 # Test blending with PNG layers as input.
 # Arguments: image name, number of processes, image size, images, image ranks
 test_blend_png =$(call test_blend,$\
 	$1,$\
 	$(BUILD)/bin/layer,$\
-	$(call glue,$5),$\
+	$(call concat,$5),$\
 	$(BUILD)/bin/icet-blend-png,$\
 	$2,$\
 	$3,$\
