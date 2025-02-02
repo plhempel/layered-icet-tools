@@ -78,29 +78,15 @@ auto main(int argc, char* argv[]) -> int {
 	auto         prev_pixel_active {false};
 
 	// For each pixel:
-	for (IceTSizeType frag_idx {0}; frag_idx < in_buffer.num_fragments();) {
-		// Leave room to count the active fragments in this pixel.
-		auto& num_frags {out.push<IceTLayerCount>(0)};
+	for (IceTSizeType pixel_start {0};
+	     pixel_start < in_buffer.num_fragments();
+	     pixel_start += in_buffer.num_layers()
+	     ) {
+		auto const& in_color {in_buffer.color()[pixel_start]};
 
-		// For each layer:
-		auto const frag_end {frag_idx + in_buffer.num_layers()};
-
-		for (; frag_idx != frag_end; ++frag_idx) {
-			auto const& in_color {in_buffer.color()[frag_idx]};
-			auto const  alpha    {in_color[color::alpha_channel]};
-
-			// Copy and count active fragments.
-			if (alpha != 0) {
-				out.push(in_color);
-				out.push(in_buffer.depth()[frag_idx]);
-				++num_frags;
-				}}
-
-		if (num_frags == 0) {
-			// No need to store fragment count for inactive pixels.
-			out.ptr -= sizeof(IceTLayerCount);
-
-			// Run lengths are stores before every inactive run.
+		// Handle inactive pixels.
+		if (in_color[color::alpha_channel] == 0) {
+			// Run lengths are stored before every inactive run.
 			if (prev_pixel_active) {
 				runlengths        = &out.push(RunLengths{});
 				prev_pixel_active = false;
@@ -108,13 +94,36 @@ auto main(int argc, char* argv[]) -> int {
 
 			// Count inactive pixels.
 			runlengths->inactive += 1;
+			continue;
 			}
-		else {
-			// Count active pixels and fragments per run.
-			runlengths->active    += 1;
-			runlengths->fragments += num_frags;
-			prev_pixel_active      = true;
-			}}
+
+		// Leave room to count the active fragments in this pixel.
+		auto& num_frags {out.push<IceTLayerCount>(1)};
+
+		// Copy the first fragment.
+		out.push(in_color);
+		out.push(in_buffer.depth()[pixel_start]);
+
+		// Process the remaining layers.
+		for (IceTLayerCount layer {1}; layer < in_buffer.num_layers(); ++layer) {
+			auto const& in_color {in_buffer.color()[pixel_start + layer]};
+
+			// Active fragments must come before inactive ones.
+			if (in_color[color::alpha_channel] == 0) {
+				break;
+				}
+
+			// Copy and count active fragments.
+			out.push(in_color);
+			out.push(in_buffer.depth()[pixel_start + layer]);
+			++num_frags;
+			}
+
+		// Count active pixels and fragments per run.
+		runlengths->active    += 1;
+		runlengths->fragments += num_frags;
+		prev_pixel_active      = true;
+		}
 
 	// Store final image size.
 	auto const size {out.ptr - out_buffer.data()};

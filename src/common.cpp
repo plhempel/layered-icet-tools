@@ -116,15 +116,18 @@ RawImage::RawImage(
 		IceTSizeType const          height,
 		std::span<InputLayer const> layers
 		)
-		: _width        {width}
-		, _height       {height}
-		, _num_layers   {int_cast<IceTSizeType>(layers.size())}
-		, _buffer       {num_fragments() * (sizeof(Color) + sizeof(Depth))}
-		, _depth_buffer {reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color))}
-		{
-	// For each layer:
-	for (std::size_t layer_idx {0}; layer_idx < layers.size(); ++layer_idx) {
-		Png const  png        {layers[layer_idx].path};
+	: _width        {width}
+	, _height       {height}
+	, _num_layers   {int_cast<IceTSizeType>(layers.size())}
+	, _buffer       {num_fragments() * (sizeof(Color) + sizeof(Depth)), std::byte{0}}
+	, _depth_buffer {reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color))}
+	{
+	// Store the number of fragments at each pixel of the output image.
+	auto layers_at {std::vector<IceTLayerCount>(num_pixels(), 0)};
+
+	// For each input image:
+	for (auto const& layer : layers) {
+		Png const  png        {layer.path};
 		auto const png_width  {int_cast<IceTSizeType>(png.get_width())};
 		auto const png_height {int_cast<IceTSizeType>(png.get_height())};
 
@@ -134,10 +137,17 @@ RawImage::RawImage(
 
 			// Copy pixels from the input image.
 			for (; x < std::min(width, png_width); ++x) {
+				// Skip empty pixels.
+				auto const& color {reinterpret_cast<Color const&>(png[y][x])};
+				auto const  alpha {color[color::alpha_channel]};
+
+				if (alpha == 0) {
+					continue;
+					}
+
 				// Copy color, scaled by alpha,
-				auto const& color   {reinterpret_cast<Color const&>(png[y][x])};
-				auto const  alpha   {color[color::alpha_channel]};
-				auto const  out_idx {(y * width + x) * _num_layers + layer_idx};
+				auto const pixel_idx {y * width + x};
+				auto const out_idx   {pixel_idx * _num_layers + layers_at[pixel_idx]};
 
 				for (std::size_t i {0}; i < color.size(); ++i) {
 					color_buffer(out_idx)[i] = color[i] * alpha / color::channel_max;
@@ -145,43 +155,32 @@ RawImage::RawImage(
 
 				color_buffer(out_idx)[color::alpha_channel] = alpha;
 
-				// Set depth, with empty fragments marked as background.
-				_depth_buffer[out_idx] = layers[layer_idx].depth;
-				}
+				// Set depth.
+				_depth_buffer[out_idx] = layer.depth;
 
-			// Clear the area outside the input image.
-			for (; x < width; ++x) {
-				auto const idx {(y * width + x) * _num_layers + layer_idx};
-
-				color_buffer(idx)  = {0, 0, 0, 0};
-				_depth_buffer[idx] = layers[layer_idx].depth;
-				}}
-
-		// Clear the area below the input image.
-		for (auto idx {png_height * width}; idx < height * width; ++idx) {
-			color_buffer(idx)  = Fragment{}.color;
-			_depth_buffer[idx] = layers[layer_idx].depth;
-			}}}
+				// Count active fragments.
+				++layers_at[pixel_idx];
+				}}}}
 
 RawImage::RawImage(
 		IceTSizeType const        width,
 		IceTSizeType const        height,
 		std::span<RawImage const> sources
 		)
-		: _width        {width}
-		, _height       {height}
-		, _num_layers   {std::accumulate(
-			sources.begin(),
-			sources.end(),
-			0,
-			[](auto const accum, RawImage const& img) {
-				return accum + img.num_layers();
-				}
-			)}
-		, _buffer       {num_fragments() * (sizeof(Color) + sizeof(Depth))}
-		, _depth_buffer {reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color))}
-		{
-	// Store all fragments at the current pixel.
+	: _width        {width}
+	, _height       {height}
+	, _num_layers   {std::accumulate(
+		sources.begin(),
+		sources.end(),
+		0,
+		[](auto const accum, RawImage const& img) {
+			return accum + img.num_layers();
+			}
+		)}
+	, _buffer       {num_fragments() * (sizeof(Color) + sizeof(Depth)), std::byte{0}}
+	, _depth_buffer {reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color))}
+	{
+	// Stores all fragments at the current pixel.
 	std::vector<Fragment> frags;
 	frags.reserve(_num_layers);
 
@@ -195,12 +194,13 @@ RawImage::RawImage(
 				if (x < img.width() and y < img.height()) {
 					for (auto layer {0}; layer < img.num_layers(); ++layer) {
 						auto const idx {(y * img.width() + x) * img.num_layers() + layer};
+
+						// Active fragments must come before inactive ones.
+						if (img.color()[idx][color::alpha_channel] == 0) {
+							break;
+							}
+
 						frags.push_back({img.color()[idx], img.depth()[idx]});
-						}}
-				else {
-					// Pixels outside a given image are filled with background.
-					for (auto layer {0}; layer < img.num_layers(); ++layer) {
-						frags.emplace_back();
 						}}}
 
 			// Sort fragments by depth.
@@ -209,8 +209,9 @@ RawImage::RawImage(
 					});
 
 			// Copy fragments to the image buffer in order.
-			for (auto layer {0}; layer < _num_layers; ++layer) {
-				auto const pixel {(y * _width + x) * _num_layers};
+			auto const pixel {(y * _width + x) * _num_layers};
+
+			for (IceTLayerCount layer {0}; layer < frags.size(); ++layer) {
 				color_buffer(pixel + layer)  = frags[layer].color;
 				_depth_buffer[pixel + layer] = frags[layer].depth;
 				}}}}
