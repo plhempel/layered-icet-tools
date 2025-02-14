@@ -1,6 +1,6 @@
 %{#include <IceT.h>
 
-namespace deep_icet {
+namespace layered_icet {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -22,4 +22,4 @@ vtree,      ICET_STRATEGY_VTREE,      false
 %%
 #pragma GCC diagnostic pop
 
-} // namespace deep_icet
+} // namespace layered_icet

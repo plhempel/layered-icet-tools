@@ -4,7 +4,7 @@
 /// Use IceT to compress a layered fragment buffer into a layered `IceTSparseImage`.
 /// Arguments: <width> <height>
 auto main(int argc, char* argv[]) -> int {
-	using namespace deep_icet;
+	using namespace layered_icet;
 	return try_main([&]() {
 
 	// IceT setup.

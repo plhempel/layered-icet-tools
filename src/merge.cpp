@@ -5,7 +5,7 @@
 /// pixel in order.
 /// Arguments: <width> <height> [<color> <depth>]...
 auto main(int argc, char* argv[]) -> int {
-	using namespace deep_icet;
+	using namespace layered_icet;
 	return try_main([&]() {
 
 	// Parse output size.

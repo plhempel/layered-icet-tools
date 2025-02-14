@@ -3,7 +3,7 @@
 
 /// Use IceT to decompress an `IceTSparseImage` into a regular `IceTImage`.
 auto main(int argc, char* argv[]) -> int {
-	using namespace deep_icet;
+	using namespace layered_icet;
 	return try_main([&]() {
 
 	// IceT setup.

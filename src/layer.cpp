@@ -4,7 +4,7 @@
 /// Assemble PNG files into a single layered fragment buffer.
 /// Arguments: <width> <height> [<image>]...
 auto main(int argc, char* argv[]) -> int {
-	using namespace deep_icet;
+	using namespace layered_icet;
 	return try_main([&]() {
 
 	// Parse output size.

@@ -28,8 +28,8 @@
 	#endif
 
 
-/// Functionality used by multiple deep-icet executables.
-namespace deep_icet {
+/// Functionality used by multiple layered-icet executables.
+namespace layered_icet {
 
 // Logging constants.
 constexpr std::string_view log_sev_info  {      "\x1b[1m[info]\x1b[m  "};
@@ -303,7 +303,7 @@ public:
 			IceTSizeType                height,
 			std::span<InputLayer const> layers
 			);
-	/// Merge multiple deep images into a single one.
+	/// Merge multiple layered images into a single one.
 	/// The fragment lists of each pixel are merged in order of depth.
 	[[nodiscard]] RawImage(
 			IceTSizeType              width,
@@ -367,4 +367,4 @@ private:
 
 	};
 
-} // namespace deep_icet
+} // namespace layered_icet

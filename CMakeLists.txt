@@ -1,12 +1,12 @@
 cmake_minimum_required (VERSION 3.19)
-project (deep-icet)
+project (layered-icet)
 
 # Includes.
 include (FetchContent)
 
 # Project configuration.
 set (CMAKE_CXX_STANDARD             20)
-set (CMAKE_CXX_STANDARD_REQUIRED    1)
+set (CMAKE_CXX_STANDARD_REQUIRED    TRUE)
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
@@ -20,7 +20,7 @@ add_library (common
 target_compile_options (common PUBLIC -Wall -Wextra -Wpedantic -Werror)
 
 # Basic setup for project executable targets.
-function (deep_icet_exe NAME)
+function (layered_icet_exe NAME)
 	add_executable ("${NAME}" "src/${NAME}.cpp")
 	target_include_directories ("${NAME}" PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/src")
 	target_link_libraries ("${NAME}" common)
@@ -28,7 +28,7 @@ function (deep_icet_exe NAME)
 
 # Generate a lookup table for compositing strategy names using perfect hashing.
 function (strategy_lookup FILE CLASS)
-	add_custom_command(
+	add_custom_command (
 		OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/src/${FILE}.hpp"
 		COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/src"
 		COMMAND gperf "${CMAKE_CURRENT_SOURCE_DIR}/res/${FILE}.gperf" -L C++ -N find -Z ${CLASS}
@@ -40,15 +40,15 @@ function (strategy_lookup FILE CLASS)
 	endfunction ()
 
 # Project executables.
-deep_icet_exe (blend)
-deep_icet_exe (compress)
-deep_icet_exe (icet-blend-png)
-deep_icet_exe (icet-blend-raw)
-deep_icet_exe (icet-compress)
-deep_icet_exe (icet-decompress)
-deep_icet_exe (icet-to-png)
-deep_icet_exe (layer)
-deep_icet_exe (merge)
+layered_icet_exe (blend)
+layered_icet_exe (compress)
+layered_icet_exe (icet-blend-png)
+layered_icet_exe (icet-blend-raw)
+layered_icet_exe (icet-compress)
+layered_icet_exe (icet-decompress)
+layered_icet_exe (icet-to-png)
+layered_icet_exe (layer)
+layered_icet_exe (merge)
 
 strategy_lookup (strategy-hash              StrategyTable)
 strategy_lookup (single-image-strategy-hash SingleImageStrategyTable)
@@ -62,8 +62,8 @@ FetchContent_Declare (icet
 	)
 
 list (APPEND FETCH_CONTENT_DEPS icet)
-set (ICET_INSTALL_NO_RUNTIME     1                                   CACHE BOOL "")
-set (ICET_INSTALL_NO_DEVELOPMENT 1                                   CACHE BOOL "")
+set (ICET_INSTALL_NO_RUNTIME     TRUE                                CACHE BOOL "")
+set (ICET_INSTALL_NO_DEVELOPMENT TRUE                                CACHE BOOL "")
 set (ICET_LIBRARY_DIR            "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}" CACHE PATH "" FORCE)
 set (ICET_EXECUTABLE_DIR         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" CACHE PATH "" FORCE)
 
@@ -88,7 +88,7 @@ find_package (MPI REQUIRED COMPONENTS C CXX)
 find_package (PNG REQUIRED)
 
 # Add dependency: png++.
-FetchContent_Declare(png++
+FetchContent_Declare (png++
 	URL https://download.savannah.nongnu.org/releases/pngpp/png++-0.2.9.tar.gz
 	)
 list (APPEND FETCH_CONTENT_DEPS png++)

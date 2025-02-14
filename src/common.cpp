@@ -4,7 +4,7 @@
 #include <numeric>
 
 
-namespace deep_icet {
+namespace layered_icet {
 
 namespace mpi {
 
@@ -271,4 +271,4 @@ auto RawImage::write(FILE* out) const -> void {
 	write_binary(depth(), out);
 	}
 
-} // namespace deep_icet
+} // namespace layered_icet

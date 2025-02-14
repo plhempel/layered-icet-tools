@@ -1,6 +1,6 @@
 %{#include <IceT.h>
 
-namespace deep_icet {
+namespace layered_icet {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -21,4 +21,4 @@ bswap-folding, ICET_SINGLE_IMAGE_STRATEGY_BSWAP_FOLDING
 %%
 #pragma GCC diagnostic pop
 
-} // namespace deep_icet
+} // namespace layered_icet

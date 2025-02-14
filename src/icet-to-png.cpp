@@ -3,7 +3,7 @@
 
 namespace {
 
-using namespace deep_icet;
+using namespace layered_icet;
 
 /// Adapts a color buffer
 struct IcetToPng : png::generator<PngPixel, IcetToPng> {

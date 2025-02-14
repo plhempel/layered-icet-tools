@@ -4,7 +4,7 @@
 /// Blend a layered fragment buffer, back to front, into a regular `IceTImage`.
 /// Arguments: <width> <height>
 auto main(int argc, char* argv[]) -> int {
-	using namespace deep_icet;
+	using namespace layered_icet;
 	return try_main([&]() {
 
 	// IceT setup.
