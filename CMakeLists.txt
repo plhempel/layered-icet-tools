@@ -67,20 +67,6 @@ set (ICET_INSTALL_NO_DEVELOPMENT TRUE                                CACHE BOOL 
 set (ICET_LIBRARY_DIR            "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}" CACHE PATH "" FORCE)
 set (ICET_EXECUTABLE_DIR         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" CACHE PATH "" FORCE)
 
-if (ICET_USE_PARICOMPRESS)
-	enable_language (CUDA)
-
-	# Dependency: PARI Compression.
-	add_library (paricompress)
-
-	set (paricompress_SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/dep/paricompress")
-	set (PARICOMPRESS_INCLUDE_DIRECTORY "${paricompress_SOURCE_DIR}/include" CACHE PATH "" FORCE)
-	set (PARICOMPRESS_LIBRARY           paricompress                         CACHE PATH "" FORCE)
-
-	target_sources (paricompress PRIVATE "${paricompress_SOURCE_DIR}/src/paricompress.cu")
-	target_include_directories (paricompress PUBLIC "${PARICOMPRESS_INCLUDE_DIRECTORY}")
-	endif ()
-
 # Dependency: MPI.
 find_package (MPI REQUIRED COMPONENTS C CXX)
 
