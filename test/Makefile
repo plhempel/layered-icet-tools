@@ -247,9 +247,9 @@ test_blend_raw =$(call test_blend,$\
 	$(foreach p,$4,$(RES)/img/$p.color $(RES)/img/$p.depth)$\
 	)
 
-$(call test_blend_raw,rt/4,0123,1280 720,rt/4/0 rt/4/1 rt/4/2 rt/4/3)
-$(call test_blend_raw,rt/8,01234567,1280 720,rt/8/0 rt/8/1 rt/8/2 rt/8/3 rt/8/4 rt/8/5 rt/8/6 rt/8/7)
-$(call test_blend_raw,rt/8,62734015,1280 720,rt/8/6 rt/8/2 rt/8/7 rt/8/3 rt/8/4 rt/8/0 rt/8/1 rt/8/5)
+$(call test_blend_raw,rt/4,0123,1920 1080,rt/4/0 rt/4/1 rt/4/2 rt/4/3)
+$(call test_blend_raw,rt/8,01234567,1920 1080,rt/8/0 rt/8/1 rt/8/2 rt/8/3 rt/8/4 rt/8/5 rt/8/6 rt/8/7)
+$(call test_blend_raw,rt/8,62734015,1920 1080,rt/8/6 rt/8/2 rt/8/7 rt/8/3 rt/8/4 rt/8/0 rt/8/1 rt/8/5)
 
 
 # If no target is selected, run all tests.
