@@ -57,11 +57,8 @@ strategy_lookup (single-image-strategy-hash SingleImageStrategyTable)
 set (FETCH_CONTENT_DEPS)
 
 # Add dependency: IceT.
-FetchContent_Declare (icet
-	SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dep/icet"
-	)
+find_package (IceT REQUIRED)
 
-list (APPEND FETCH_CONTENT_DEPS icet)
 set (ICET_INSTALL_NO_RUNTIME     TRUE                                CACHE BOOL "")
 set (ICET_INSTALL_NO_DEVELOPMENT TRUE                                CACHE BOOL "")
 set (ICET_LIBRARY_DIR            "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}" CACHE PATH "" FORCE)
@@ -83,11 +80,8 @@ list (APPEND FETCH_CONTENT_DEPS png++)
 FetchContent_MakeAvailable ("${FETCH_CONTENT_DEPS}")
 
 # Use dependency: IceT.
-target_include_directories (IceTCore PUBLIC
-	"${icet_SOURCE_DIR}/src/include"
-	"${icet_BINARY_DIR}/src/include"
-	)
-target_link_libraries (IceTMPI
+target_include_directories (IceTCore INTERFACE "${ICET_INCLUDE_DIRS}")
+target_link_libraries (IceTMPI INTERFACE
 	MPI::MPI_C
 	MPI::MPI_CXX
 	)
