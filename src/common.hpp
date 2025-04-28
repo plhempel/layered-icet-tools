@@ -296,6 +296,8 @@ struct InputLayer {
 /// Can be written to and read from a file.
 class RawImage {
 public:
+	[[nodiscard]] RawImage() noexcept = default;
+
 	/// Build an image by layering PNGs.
 	/// Scales each fragment's color by its alpha value.
 	[[nodiscard]] RawImage(

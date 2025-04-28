@@ -245,7 +245,7 @@ RawImage::RawImage(
 	: _width  {width}
 	, _height {height}
 	{
-	auto const layer_size {width * height * sizeof(Color)};
+	auto const layer_size {num_pixels() * sizeof(Color)};
 
 	// Read color data.
 	_buffer = read_all(color_file, layer_size);
@@ -258,7 +258,9 @@ RawImage::RawImage(
 		}
 
 	// Read depth data.
-	_buffer.resize(_buffer.size() + num_pixels() * sizeof(Depth));
+	if (not depth_file) return;
+
+	_buffer.resize(_buffer.size() + num_fragments() * sizeof(Depth));
 	_depth_buffer = reinterpret_cast<Depth*>(_buffer.data() + num_fragments() * sizeof(Color));
 	read_binary(
 			depth_file,

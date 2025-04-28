@@ -26,7 +26,7 @@ auto main(int argc, char* argv[]) -> int {
 	// Parse strategy.
 	std::string_view const strategy_name {argv[1], std::strcspn(argv[1], "/")};
 	auto const             strategy      {
-			StrategyTable::find(strategy_name.data(), strategy_name.size())};
+			StrategyLut::find(strategy_name.data(), strategy_name.size())};
 
 	if (not strategy) {
 		std::cerr << log_sev_fatal << "Unknown compositing strategy `" << strategy_name << "`.\n";
@@ -45,7 +45,7 @@ auto main(int argc, char* argv[]) -> int {
 
 		std::string_view const si_strategy_name {strategy_name.end() + 1};
 		auto const             si_strategy      {
-				SingleImageStrategyTable::find(si_strategy_name.data(), si_strategy_name.size())};
+				SingleImageStrategyLut::find(si_strategy_name.data(), si_strategy_name.size())};
 
 		if (not si_strategy) {
 			std::cerr << log_sev_fatal << "Unknown single image compositing strategy `"
